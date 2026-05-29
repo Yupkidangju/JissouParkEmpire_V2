@@ -34,14 +34,8 @@ Thumbs.db
 .flaskenv
 
 # === D3D Protocol: Git 관리 정책 ===
-# README.md, CHANGELOG.md, BUILD_GUIDE.md만 Git에 포함
-# 아래 문서들은 로컬에서만 관리 (Git에 올리지 않음)
-spec.md
-designs.md
-IMPLEMENTATION_SUMMARY.md
-LESSONS_LEARNED.md
-DESIGN_DECISIONS.md
-audit_roadmap.md
+# 프로젝트의 모든 소스 코드와 개발 시 생성되는 모든 MD 문서는 Git에 업로드
+# (AGENTS.md Git Management Rules 기준)
 
 # Antigravity 아카이브
 .antigravity/
