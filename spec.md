@@ -1,7 +1,7 @@
 # 실장석 공원 제국 (Jissou Park Empire) - 마스터 스펙 (spec.md)
 
-> **문서 버전**: v1.6.3  
-> **마지막 갱신**: 2026-05-29  
+> **문서 버전**: v1.7.0  
+> **마지막 갱신**: 2026-05-30  
 > **상태**: 동결(Frozen) — 구현 참조용  
 > **언어**: 한국어 (기준 문서)
 
@@ -62,6 +62,8 @@
 | 스케줄러 | APScheduler (백그라운드) | 10분 간격 자동 턴 처리, 경량 |
 | 다국어 | JSON 파일 기반 i18n | APK 이식 시 그대로 재사용 가능 |
 | UI 테마 | BBS 레트로 터미널 × 실장석 감성 | 브랜드 정체성 |
+| UI 프레임워크 | Tailwind CSS CDN | Jinja2 호환성 및 신속한 반응형 레트로 스타일링 구현 |
+| 가상 스킬 트리 | skills.html (이스터에그 모크업) | 향후 보스 스킬 시스템 확장을 대비한 백로그 UI 선제공 |
 | 난이도 커브 | 보호 모드 + 잔혹 이벤트 | 신규 유저 보호 + 중후반 긴장감 |
 | NPC 수 | 8개 (서버 시작 시 자동 생성) | 밸런스 검증된 수치 |
 | 게임오버 조건 | 보스 HP ≤ 0 | 단일 명확한 실패 조건 |
@@ -82,7 +84,7 @@
 | 스케줄러 | APScheduler | >=3.10 |
 | DB | SQLite | 3 (파일: `game.db`) |
 | 템플릿 | Jinja2 | (Flask 내장) |
-| CSS/JS | 순수 CSS3 / ES6 | — |
+| CSS/JS | 순수 CSS3 / ES6 + Tailwind CSS CDN | CSS 변수와 유틸리티 클래스의 하이브리드 결합 |
 | 폰트 | IBM Plex Mono, Noto Sans KR | Google Fonts CDN |
 
 ### 5.2 아키텍처 원칙
@@ -146,7 +148,8 @@ JissouParkEmpire/
 │   │   ├── trade.html
 │   │   ├── ranking.html
 │   │   ├── battle_logs.html
-│   │   └── gameover.html
+│   │   ├── gameover.html
+│   │   └── skills.html      # [NEW] 가상 스킬 트리 모크업 터미널
 │   ├── static/
 │   │   ├── css/style.css    # 레트로 터미널 스타일시트
 │   │   └── js/game.js       # 클라이언트 스크립트 (타이머, 모달, 폴링)
@@ -658,6 +661,13 @@ NP 필요량: 3*3 + 10*1 + 5*0.5 = 21.5 NP
 ### Phase 9: 미래 (미정)
 28. 안드로이드 APK 빌드 (Kivy/BeeWare)
 
+### Phase 10: UI/UX 리팩토링 및 Gore-Terminal 디자인 시스템 반영 (완료)
+29. [Base] Tailwind CSS CDN 도입 및 `base.html` CRT 효과 레이어 탑재
+30. [Dashboard] 대시보드 그리드 리팩토링, 실장석 도트 아바타 영역 추가, 액션 카드 고도화
+31. [Trade/Diplomacy] 교역/외교 UI의 고밀도 BBS 탭 인터페이스 전환
+32. [Collapse] 보스 사망 시 붉은색 글리치 시스템 크래시 화면 개선
+33. [Skills] 가상 스킬 트리 템플릿(`skills.html`) 및 이스터에그 인터랙션 추가
+
 ---
 
 ## 15. 명령어와 검증 기준
@@ -685,6 +695,10 @@ python run.py
 | 8 | 다국어 | `/set-lang/en` → 대시보드 확인 | UI 텍스트 영어로 변경 |
 | 9 | 음수 방어 | `park.baby_count = -5; db.session.commit()` | DB에 0으로 저장 |
 | 10 | 보호 모드 | 성체/경호를 0으로 조작 → 대시보드 | 🛡️ 배너 표시 + 침공 버튼 비활성 |
+| 11 | CRT 이펙트 및 플리커 | 대시보드 페이지 로드 | 8초 주기 스캔라인 및 0.15s 플리커 작동 |
+| 12 | 반응형 브레이크포인트 | 1200px / 768px / 480px 화면 축소 | Grid 컬럼이 3열 → 2열 → 1열로 자동 전환 |
+| 13 | 스킬 트리 이스터에그 | 대시보드 하단 네비게이션 `[SKILLS]` 클릭 | SP 충전 카운터 연동 가상 스킬 트리 모크업 출력 |
+| 14 | 다국어 일관성 | ko / en / ja / zh_tw / zh_cn 언어 전환 | 번역 헬퍼 `t()`가 깨짐 없이 정상 출력됨 |
 
 ---
 

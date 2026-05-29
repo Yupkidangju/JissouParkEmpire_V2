@@ -1,7 +1,7 @@
 # 실장석 공원 제국 - 감사 로드맵 (audit_roadmap.md)
 
-> **문서 버전**: v1.6.3  
-> **마지막 갱신**: 2026-05-29  
+> **문서 버전**: v1.7.0  
+> **마지막 갱신**: 2026-05-30  
 > **상태**: 동결(Frozen)  
 > **표준**: `AI_IMPLEMENTATION_DOC_STANDARD.md` 및 `spec.md` 파생  
 
@@ -113,6 +113,15 @@
 | 로컬 프로필 | SQLite 파일 로컬 저장 | `game.db` → 내부 저장소 경로 |
 | NPC 자동 교역 | 기존 TradeOffer 로직 재사용 | receiver_id=NULL 자동 수락 |
 | 턴 타이머 | APScheduler → Kivy Clock | `Clock.schedule_interval` |
+
+#### Phase 10: UI/UX 리팩토링 및 Gore-Terminal 디자인 시스템 반영 (완료)
+| 마일스톤 | 구현 항목 | 디자인/UX 적합성 검증 방법 | 데이터 정합성 통과 기준 |
+|---------|----------|--------------------------|----------------------|
+| **MS 1: Base & CRT** | - Tailwind CSS 및 Material Symbols CDN 도입<br>- `base.html`에 CRT 스캔라인 및 0.15s 플리커링 탑재<br>- `--bg`, `--text-bright` 등 커스텀 변수 정의 | 브라우저 F12 성능 탭에서 플리커 애니메이션의 CPU 과부하 여부 체크 | `style.css` 내 컬러 토큰이 `designs.md` 명세서와 100% 일치 |
+| **MS 2: Dashboard** | - Tailwind 기반 3열 반응형 그리드 적용<br>- 인사말 좌측에 픽셀 도트 실장석 아바타 탑재<br>- 6단 AP 게이지 바 및 카운트다운 타이머 연동 | 1200px -> 768px -> 480px 화면 축소 시 그리드가 3열->2열->1열로 깨짐 없이 자동 전환되는지 확인 | `current_user.park` 모델 데이터가 현황 패널 및 아바타에 올바르게 바인딩 |
+| **MS 3: Actions & Modals** | - 액션 버튼 호버/클릭(active:scale-95) 애니메이션<br>- 솎아내기 Crimson 경고 점멸<br>- 정찰/침공 모달을 Combat Analyzer 테마로 고도화 | 솎아내기 시 confirm 창이 정상적으로 뜨며, 모달 팝업 시 뒷배경 흐림 효과(`backdrop-filter: blur`)가 미려하게 먹히는지 검증 | 모달의 폼 전송 데이터가 `game_routes.py` 라우트 파라미터와 오차 없이 통신 |
+| **MS 4: Trade & Diplomacy** | - `trade.html`을 고밀도 BBS 탭 UI로 전환<br>- 외교 관계 및 교역 시장 현황을 Phosphor Green/Crimson 컬러 바로 텐션 극대화 | 탭 전환 시 화면 깜빡임 없이 DOM 콘텐츠가 동적으로 스위칭되는지 확인 | 교역 시장 자원 아이콘과 NP 수치가 모델 스펙과 온전히 일치 |
+| **MS 5: Collapse & Skills** | - `gameover.html` 에러 글리치 효과<br>- `skills.html` 가상 스킬 트리 추가<br>- 1초 주기 SP 요동 카운터 및 SVG 연결망 시각화 | 보스 사망 시 붉은 화면 및 글리치 연출 확인. 스킬 노드 클릭 시 상세 카드가 팝업되는지 확인 | `skills.html` 내의 다국어 텍스트가 번역 헬퍼 `t()`와 정상 연동되는지 체크 |
 
 ---
 

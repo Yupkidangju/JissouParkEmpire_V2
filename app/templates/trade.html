@@ -2,312 +2,451 @@
 {% block title %}{{ t('trade.page_title') }}{% endblock %}
 
 {% block content %}
-<div class="terminal-box logo-box" style="text-align:center; padding:10px;">
-    <div style="font-size:18px;">{{ t('trade.title') }}</div>
-    <div style="font-size:11px; color:var(--text-dim);">{{ t('trade.page_subtitle') }}</div>
-</div>
+<main class="max-w-7xl mx-auto p-2 md:p-4 space-y-4">
+    <!-- Header (Trade & Diplomacy Hub) -->
+    <header class="w-full flex flex-col md:flex-row justify-between items-start md:items-center p-panel-padding bg-surface border-2 border-outline inner-glow-primary gap-4">
+        <div>
+            <h2 class="font-display-lg text-[22px] md:text-[26px] font-bold text-primary uppercase tracking-tighter glow-sm flex items-center gap-2">
+                🤝 <span class="text-primary-container">{{ t('trade.title') }}</span>
+            </h2>
+            <p class="font-label-kr text-xs text-on-surface-variant italic mt-1">
+                {{ t('trade.page_subtitle') }}
+            </p>
+        </div>
+        <div class="flex items-center gap-4 text-xs font-code-critical">
+            <span class="text-[#eeffe4] border border-outline-variant px-3 py-1.5 bg-surface-container-lowest">
+                🍬 KONPEITO: <strong class="text-accent">{{ park.konpeito }}</strong>
+            </span>
+            <span class="text-[#eeffe4] border border-outline-variant px-3 py-1.5 bg-surface-container-lowest">
+                🧱 MATERIAL: <strong class="text-primary-container">{{ park.material }}</strong>
+            </span>
+        </div>
+    </header>
 
-<!-- === 현재 자원 표시 === -->
-<div class="terminal-box" style="margin-bottom:10px;">
-    <div class="box-header">{{ t('trade.my_resources') }}</div>
-    <div class="box-content" style="display:flex; gap:16px; flex-wrap:wrap; font-size:12px;">
-        <span>{{ t('dash.konpeito') }}: <strong>{{ park.konpeito }}</strong>/{{ park.konpeito_cap }}</span>
-        <span>{{ t('dash.trash_short') }}: <strong>{{ park.trash_food }}</strong>/{{ park.trash_food_cap }}</span>
-        <span>{{ t('dash.material') }}: <strong>{{ park.material }}</strong>/{{ park.material_cap }}</span>
-        <span>{{ t('dash.babies') }}: <strong>{{ park.baby_count }}</strong></span>
+    <!-- Tab Buttons (BBS High-Density Navigation) -->
+    <div class="flex border-b-2 border-outline">
+        <button id="tab-trade-btn" class="px-6 py-3 bg-primary-container text-background font-bold text-xs uppercase border-t-2 border-x-2 border-outline-variant mr-1 transition-all active:scale-95">
+            📠 TRADE_CENTER
+        </button>
+        <button id="tab-diplo-btn" class="px-6 py-3 bg-surface text-on-surface-variant font-bold text-xs uppercase border-t-2 border-x border-outline-variant/30 transition-all hover:bg-surface-container-high hover:text-primary active:scale-95">
+            ⚔️ DIPLOMACY_HEADQUARTERS
+        </button>
     </div>
-</div>
 
-<!-- === 교역 제안 생성 === -->
-<div class="terminal-box" style="margin-bottom:10px;">
-    <div class="box-header">{{ t('trade.create_title') }}</div>
-    <div class="box-content">
-        <form method="POST" action="{{ url_for('game.trade_create') }}" id="trade-form">
-            <div style="display:flex; gap:20px; flex-wrap:wrap; margin-bottom:10px;">
-                <div style="flex:1; min-width:200px;">
-                    <div style="color:var(--danger); font-size:13px; margin-bottom:6px;">{{ t('trade.offer') }}</div>
-                    <div class="stat-line">{{ t('dash.konpeito') }}: <input type="number" name="offer_konpeito"
-                            value="0" min="0" max="{{ park.konpeito }}" class="num-input" style="width:60px;"></div>
-                    <div class="stat-line">{{ t('dash.trash_short') }}: <input type="number" name="offer_trash"
-                            value="0" min="0" max="{{ park.trash_food }}" class="num-input" style="width:60px;"></div>
-                    <div class="stat-line">{{ t('dash.material') }}: <input type="number" name="offer_material"
-                            value="0" min="0" max="{{ park.material }}" class="num-input" style="width:60px;"></div>
-                    <div class="stat-line">{{ t('dash.babies') }}: <input type="number" name="offer_babies" value="0"
-                            min="0" max="{{ park.baby_count }}" class="num-input" style="width:60px;"></div>
-                </div>
-                <div style="flex:1; min-width:200px;">
-                    <div style="color:var(--accent); font-size:13px; margin-bottom:6px;">{{ t('trade.request') }}</div>
-                    <div class="stat-line">{{ t('dash.konpeito') }}: <input type="number" name="request_konpeito"
-                            value="0" min="0" class="num-input" style="width:60px;"></div>
-                    <div class="stat-line">{{ t('dash.trash_short') }}: <input type="number" name="request_trash"
-                            value="0" min="0" class="num-input" style="width:60px;"></div>
-                    <div class="stat-line">{{ t('dash.material') }}: <input type="number" name="request_material"
-                            value="0" min="0" class="num-input" style="width:60px;"></div>
-                    <div class="stat-line">{{ t('dash.babies') }}: <input type="number" name="request_babies" value="0"
-                            min="0" class="num-input" style="width:60px;"></div>
-                </div>
+    <!-- Tab Content: TRADE CENTER -->
+    <div id="tab-trade-content" class="space-y-4">
+        <!-- 4-Grid Current Inventory Summary -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-2 font-code-critical text-xs">
+            <div class="p-2 border border-outline bg-surface flex justify-between items-center">
+                <span class="text-accent">🍬 {{ t('dash.konpeito') }}</span>
+                <strong>{{ park.konpeito }} / {{ park.konpeito_cap }}</strong>
             </div>
-            <div style="margin-bottom:8px;">
-                <label style="font-size:11px; color:var(--text-dim);">{{ t('trade.target') }}:</label>
-                <select name="receiver_id" class="num-input" style="width:200px; text-align:left;">
-                    <option value="0">{{ t('trade.public') }}</option>
-                    {% for p in other_parks %}
-                    <option value="{{ p.id }}">{{ p.name }}{% if p.is_npc %} (NPC){% endif %}</option>
-                    {% endfor %}
-                </select>
+            <div class="p-2 border border-outline bg-surface flex justify-between items-center">
+                <span class="text-on-surface-variant">🗑️ {{ t('dash.trash_short') }}</span>
+                <strong>{{ park.trash_food }} / {{ park.trash_food_cap }}</strong>
             </div>
-            <div style="margin-bottom:8px;">
-                <label style="font-size:11px; color:var(--text-dim);">{{ t('trade.message') }}:</label>
-                <input type="text" name="trade_message" placeholder="{{ t('trade.message_placeholder') }}"
-                    class="num-input" style="width:100%; max-width:300px; text-align:left;">
+            <div class="p-2 border border-outline bg-surface flex justify-between items-center">
+                <span class="text-[#ffcf90]">🧱 {{ t('dash.material') }}</span>
+                <strong>{{ park.material }} / {{ park.material_cap }}</strong>
             </div>
-            <button type="submit" class="terminal-btn btn-primary" id="btn-trade-submit">{{ t('trade.submit')
-                }}</button>
-        </form>
-    </div>
-</div>
-
-<!-- === 받은 교역 제안 === -->
-{% if my_incoming %}
-<div class="terminal-box" style="margin-bottom:10px;">
-    <div class="box-header" style="color:var(--konpeito);">{{ t('trade.incoming') }} ({{ my_incoming|length }})</div>
-    <div class="box-content">
-        {% for trade in my_incoming %}
-        <div style="border:1px solid var(--border); padding:8px; margin-bottom:6px; border-radius:4px;">
-            <div style="font-size:12px; margin-bottom:4px;">
-                <strong>{{ trade.sender.name }}</strong>{% if trade.sender.is_npc %} <span class="npc-personality"
-                    style="font-size:9px;">(NPC)</span>{% endif %}
-                {% if trade.message %}<span style="color:var(--text-dim); font-style:italic;"> "{{ trade.message
-                    }}"</span>{% endif %}
-            </div>
-            <div style="display:flex; gap:16px; font-size:11px; flex-wrap:wrap;">
-                <div style="color:var(--accent);">
-                    {{ t('trade.incoming_receive') }}: {% if trade.offer_konpeito %}🍬{{ trade.offer_konpeito }} {%
-                    endif %}{% if trade.offer_trash
-                    %}🗑️{{ trade.offer_trash }} {% endif %}{% if trade.offer_material %}🧱{{ trade.offer_material }} {%
-                    endif %}{% if trade.offer_babies %}🐛{{ trade.offer_babies }}{% endif %}
-                </div>
-                <div style="color:var(--danger);">
-                    {{ t('trade.incoming_give') }}: {% if trade.request_konpeito %}🍬{{ trade.request_konpeito }} {%
-                    endif %}{% if
-                    trade.request_trash %}🗑️{{ trade.request_trash }} {% endif %}{% if trade.request_material %}🧱{{
-                    trade.request_material }} {% endif %}{% if trade.request_babies %}🐛{{ trade.request_babies }}{%
-                    endif %}
-                </div>
-            </div>
-            <div style="margin-top:6px; display:flex; gap:6px;">
-                <form method="POST" action="{{ url_for('game.trade_accept', trade_id=trade.id) }}"
-                    style="display:inline;">
-                    <button type="submit" class="terminal-btn btn-primary" style="font-size:10px; padding:2px 8px;">✅
-                        {{ t('trade.accept') }}</button>
-                </form>
-                <form method="POST" action="{{ url_for('game.trade_reject', trade_id=trade.id) }}"
-                    style="display:inline;">
-                    <button type="submit" class="terminal-btn" style="font-size:10px; padding:2px 8px;">{{
-                        t('trade.reject') }}</button>
-                </form>
+            <div class="p-2 border border-outline bg-surface flex justify-between items-center">
+                <span class="text-error">🐛 {{ t('dash.babies') }}</span>
+                <strong>{{ park.baby_count }}</strong>
             </div>
         </div>
-        {% endfor %}
-    </div>
-</div>
-{% endif %}
 
-<!-- === 공개 교역 시장 === -->
-<div class="terminal-box" style="margin-bottom:10px;">
-    <div class="box-header">{{ t('trade.market') }}</div>
-    <div class="box-content">
-        {% if public_trades %}
-        {% for trade in public_trades %}
-        <div style="border:1px solid var(--border); padding:8px; margin-bottom:6px; border-radius:4px;">
-            <div style="font-size:12px; margin-bottom:4px;">
-                <strong>{{ trade.sender.name }}</strong>{% if trade.sender.is_npc %} <span
-                    style="font-size:9px; color:var(--text-dim);">(NPC)</span>{% endif %}
-                {% if trade.message %}<span style="color:var(--text-dim); font-style:italic;"> "{{ trade.message
-                    }}"</span>{% endif %}
+        <!-- Create Trade Offer Form -->
+        <div class="bg-surface border-2 border-outline p-panel-padding space-y-4">
+            <div class="bg-primary text-background px-2 py-1 font-bold text-xs uppercase tracking-wider flex items-center justify-between">
+                <span>📠 CREATE NEW TRADE_OFFER</span>
+                <span class="material-symbols-outlined text-[14px]">toll</span>
             </div>
-            <div style="display:flex; gap:16px; font-size:11px; flex-wrap:wrap;">
-                <div style="color:var(--accent);">
-                    {{ t('trade.incoming_receive') }}: {% if trade.offer_konpeito %}🍬{{ trade.offer_konpeito }} {%
-                    endif %}{% if trade.offer_trash
-                    %}🗑️{{ trade.offer_trash }} {% endif %}{% if trade.offer_material %}🧱{{ trade.offer_material }} {%
-                    endif %}{% if trade.offer_babies %}🐛{{ trade.offer_babies }}{% endif %}
+            <form method="POST" action="{{ url_for('game.trade_create') }}" id="trade-form" class="space-y-4 font-code-critical text-xs">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 border border-outline-variant/30 p-4 bg-surface-container-lowest">
+                    <!-- Offer Column -->
+                    <div class="space-y-3">
+                        <div class="text-error font-bold text-[13px] border-b border-error/30 pb-1 flex items-center gap-1.5">
+                            <span class="material-symbols-outlined text-sm">remove_circle_outline</span>
+                            {{ t('trade.offer') }} (선차감 에스크로)
+                        </div>
+                        <div class="space-y-2">
+                            <label class="flex justify-between items-center">
+                                <span class="text-on-surface-variant">🍬 {{ t('dash.konpeito') }}</span>
+                                <input type="number" name="offer_konpeito" value="0" min="0" max="{{ park.konpeito }}" class="bg-surface border border-outline px-2 py-1 w-20 text-center focus:ring-0 num-input">
+                            </label>
+                            <label class="flex justify-between items-center">
+                                <span class="text-on-surface-variant">🗑️ {{ t('dash.trash_short') }}</span>
+                                <input type="number" name="offer_trash" value="0" min="0" max="{{ park.trash_food }}" class="bg-surface border border-outline px-2 py-1 w-20 text-center focus:ring-0 num-input">
+                            </label>
+                            <label class="flex justify-between items-center">
+                                <span class="text-on-surface-variant">🧱 {{ t('dash.material') }}</span>
+                                <input type="number" name="offer_material" value="0" min="0" max="{{ park.material }}" class="bg-surface border border-outline px-2 py-1 w-20 text-center focus:ring-0 num-input">
+                            </label>
+                            <label class="flex justify-between items-center">
+                                <span class="text-on-surface-variant">🐛 {{ t('dash.babies') }}</span>
+                                <input type="number" name="offer_babies" value="0" min="0" max="{{ park.baby_count }}" class="bg-surface border border-outline px-2 py-1 w-20 text-center focus:ring-0 num-input">
+                            </label>
+                        </div>
+                    </div>
+                    <!-- Request Column -->
+                    <div class="space-y-3">
+                        <div class="text-accent font-bold text-[13px] border-b border-accent/30 pb-1 flex items-center gap-1.5">
+                            <span class="material-symbols-outlined text-sm">add_circle_outline</span>
+                            {{ t('trade.request') }} (상대방 차감 자원)
+                        </div>
+                        <div class="space-y-2">
+                            <label class="flex justify-between items-center">
+                                <span class="text-on-surface-variant">🍬 {{ t('dash.konpeito') }}</span>
+                                <input type="number" name="request_konpeito" value="0" min="0" class="bg-surface border border-outline px-2 py-1 w-20 text-center focus:ring-0 num-input">
+                            </label>
+                            <label class="flex justify-between items-center">
+                                <span class="text-on-surface-variant">🗑️ {{ t('dash.trash_short') }}</span>
+                                <input type="number" name="request_trash" value="0" min="0" class="bg-surface border border-outline px-2 py-1 w-20 text-center focus:ring-0 num-input">
+                            </label>
+                            <label class="flex justify-between items-center">
+                                <span class="text-on-surface-variant">🧱 {{ t('dash.material') }}</span>
+                                <input type="number" name="request_material" value="0" min="0" class="bg-surface border border-outline px-2 py-1 w-20 text-center focus:ring-0 num-input">
+                            </label>
+                            <label class="flex justify-between items-center">
+                                <span class="text-on-surface-variant">🐛 {{ t('dash.babies') }}</span>
+                                <input type="number" name="request_babies" value="0" min="0" class="bg-surface border border-outline px-2 py-1 w-20 text-center focus:ring-0 num-input">
+                            </label>
+                        </div>
+                    </div>
                 </div>
-                <div style="color:var(--danger);">
-                    {{ t('trade.incoming_give') }}: {% if trade.request_konpeito %}🍬{{ trade.request_konpeito }} {%
-                    endif %}{% if
-                    trade.request_trash %}🗑️{{ trade.request_trash }} {% endif %}{% if trade.request_material %}🧱{{
-                    trade.request_material }} {% endif %}{% if trade.request_babies %}🐛{{ trade.request_babies }}{%
-                    endif %}
-                </div>
-            </div>
-            <div style="margin-top:6px;">
-                <form method="POST" action="{{ url_for('game.trade_accept', trade_id=trade.id) }}"
-                    style="display:inline;">
-                    <button type="submit" class="terminal-btn btn-primary" style="font-size:10px; padding:2px 8px;">✅
-                        {{ t('trade.accept') }}</button>
-                </form>
-            </div>
-        </div>
-        {% endfor %}
-        {% else %}
-        <div style="color:var(--text-dim); font-size:12px; text-align:center; padding:16px;">
-            {{ t('trade.no_market') }}
-        </div>
-        {% endif %}
-    </div>
-</div>
 
-<!-- === 내가 보낸 제안 === -->
-{% if my_outgoing %}
-<div class="terminal-box" style="margin-bottom:10px;">
-    <div class="box-header">{{ t('trade.outgoing') }} ({{ my_outgoing|length }})</div>
-    <div class="box-content">
-        {% for trade in my_outgoing %}
-        <div
-            style="border:1px solid var(--border); padding:8px; margin-bottom:6px; border-radius:4px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap;">
-            <div style="font-size:11px;">
-                → {% if trade.receiver %}{{ trade.receiver.name }}{% else %}🌐 {{ t('trade.public') }}{% endif %}
-                | {{ t('trade.outgoing_to') }}: {% if trade.offer_konpeito %}🍬{{ trade.offer_konpeito }}{% endif %}{%
-                if trade.offer_trash %}
-                🗑️{{ trade.offer_trash }}{% endif %}{% if trade.offer_material %} 🧱{{ trade.offer_material }}{% endif
-                %}{% if trade.offer_babies %} 🐛{{ trade.offer_babies }}{% endif %}
-                | {{ t('trade.outgoing_req') }}: {% if trade.request_konpeito %}🍬{{ trade.request_konpeito }}{% endif
-                %}{% if trade.request_trash
-                %} 🗑️{{ trade.request_trash }}{% endif %}{% if trade.request_material %} 🧱{{ trade.request_material
-                }}{% endif %}{% if trade.request_babies %} 🐛{{ trade.request_babies }}{% endif %}
-            </div>
-            <form method="POST" action="{{ url_for('game.trade_cancel', trade_id=trade.id) }}">
-                <button type="submit" class="terminal-btn" style="font-size:10px; padding:2px 6px;">{{ t('trade.cancel')
-                    }}</button>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <label class="flex flex-col gap-1">
+                        <span class="text-text-dim text-[10px] uppercase font-bold">{{ t('trade.target') }}:</span>
+                        <select name="receiver_id" class="bg-surface-container-lowest text-primary border border-outline px-2 py-1.5 focus:ring-0">
+                            <option value="0">🌐 {{ t('trade.public') }}</option>
+                            {% for p in other_parks %}
+                            <option value="{{ p.id }}">{{ p.name }}{% if p.is_npc %} (NPC){% endif %}</option>
+                            {% endfor %}
+                        </select>
+                    </label>
+                    <label class="flex flex-col gap-1">
+                        <span class="text-text-dim text-[10px] uppercase font-bold">{{ t('trade.message') }}:</span>
+                        <input type="text" name="trade_message" placeholder="{{ t('trade.message_placeholder') }}" class="bg-surface-container-lowest border border-outline px-3 py-1.5 focus:ring-0">
+                    </label>
+                </div>
+
+                <button type="submit" class="w-full py-2 bg-primary-container text-background font-bold text-xs uppercase hover:brightness-125 transition-all active:scale-95 text-center block" id="btn-trade-submit">
+                    {{ t('trade.submit') }}
+                </button>
             </form>
         </div>
-        {% endfor %}
-    </div>
-</div>
-{% endif %}
 
-<!-- ============================================================ -->
-<!-- 외교 섹션 -->
-<!-- ============================================================ -->
-<div class="terminal-box" style="margin-bottom:10px;">
-    <div class="box-header">{{ t('diplo.title') }}</div>
-    <div class="box-content">
-
-        <!-- 동맹 요청 (수신) -->
-        {% if alliance_requests %}
-        <div style="margin-bottom:10px;">
-            <div style="color:var(--konpeito); font-size:12px; margin-bottom:4px;">{{ t('diplo.incoming_requests') }}
-                ({{ alliance_requests|length }})</div>
-            {% for d in alliance_requests %}
-            <div
-                style="border:1px solid var(--border); padding:6px; margin-bottom:4px; border-radius:4px; display:flex; justify-content:space-between; align-items:center;">
-                <span style="font-size:12px;">🤝 {{ d.park_a.name }}</span>
-                <div style="display:flex; gap:4px;">
-                    <form method="POST" action="{{ url_for('game.diplomacy_accept', diplo_id=d.id) }}"
-                        style="display:inline;">
-                        <button type="submit" class="terminal-btn btn-primary"
-                            style="font-size:10px; padding:2px 6px;">{{ t('diplo.accept') }}</button>
-                    </form>
-                    <form method="POST" action="{{ url_for('game.diplomacy_reject', diplo_id=d.id) }}"
-                        style="display:inline;">
-                        <button type="submit" class="terminal-btn" style="font-size:10px; padding:2px 6px;">{{
-                            t('diplo.reject') }}</button>
-                    </form>
-                </div>
+        <!-- Received Trade Offers (Incoming) -->
+        {% if my_incoming %}
+        <div class="bg-surface border-2 border-outline p-panel-padding space-y-3">
+            <div class="bg-accent text-background px-2 py-1 font-bold text-xs uppercase tracking-wider flex items-center justify-between">
+                <span>📥 {{ t('trade.incoming') }} ({{ my_incoming|length }})</span>
+                <span class="material-symbols-outlined text-[14px]">call_received</span>
             </div>
-            {% endfor %}
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 font-code-critical text-xs">
+                {% for trade in my_incoming %}
+                <div class="border border-outline bg-surface-container-lowest p-3 flex flex-col justify-between space-y-3">
+                    <div>
+                        <div class="flex justify-between items-start border-b border-outline-variant/30 pb-1.5">
+                            <strong class="text-primary">{{ trade.sender.name }}</strong>
+                            {% if trade.sender.is_npc %}<span class="text-[9px] bg-outline-variant/30 text-outline border border-outline-variant/50 px-1 font-normal">NPC</span>{% endif %}
+                        </div>
+                        {% if trade.message %}
+                        <p class="text-[11px] text-text-dim italic leading-relaxed mt-1 font-label-kr">
+                            "{{ trade.message }}"
+                        </p>
+                        {% endif %}
+                        <div class="space-y-1 mt-2.5 text-[11px]">
+                            <div class="text-accent flex items-center gap-1">
+                                <span class="material-symbols-outlined text-xs">add_circle</span>
+                                {{ t('trade.incoming_receive') }}: {% if trade.offer_konpeito %}🍬{{ trade.offer_konpeito }} {% endif %}{% if trade.offer_trash %}🗑️{{ trade.offer_trash }} {% endif %}{% if trade.offer_material %}🧱{{ trade.offer_material }} {% endif %}{% if trade.offer_babies %}🐛{{ trade.offer_babies }}{% endif %}
+                            </div>
+                            <div class="text-error flex items-center gap-1">
+                                <span class="material-symbols-outlined text-xs">remove_circle</span>
+                                {{ t('trade.incoming_give') }}: {% if trade.request_konpeito %}🍬{{ trade.request_konpeito }} {% endif %}{% if trade.request_trash %}🗑️{{ trade.request_trash }} {% endif %}{% if trade.request_material %}🧱{{ trade.request_material }} {% endif %}{% if trade.request_babies %}🐛{{ trade.request_babies }}{% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex gap-2 border-t border-outline-variant/20 pt-2.5">
+                        <form method="POST" action="{{ url_for('game.trade_accept', trade_id=trade.id) }}" class="flex-1">
+                            <button type="submit" class="w-full py-1.5 bg-primary-container text-background font-bold text-[10px] uppercase hover:brightness-125 transition-all active:scale-95 text-center">
+                                ✅ {{ t('trade.accept') }}
+                            </button>
+                        </form>
+                        <form method="POST" action="{{ url_for('game.trade_reject', trade_id=trade.id) }}" class="flex-1">
+                            <button type="submit" class="w-full py-1.5 border border-error text-error font-bold text-[10px] uppercase hover:bg-error hover:text-white transition-all active:scale-95 text-center">
+                                ❌ {{ t('trade.reject') }}
+                            </button>
+                        </form>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
         </div>
         {% endif %}
 
-        <!-- 현재 동맹 -->
-        <div style="margin-bottom:10px;">
-            <div style="color:var(--accent); font-size:12px; margin-bottom:4px;">{{ t('diplo.current_allies') }} ({{
-                alliances|length }})</div>
-            {% if alliances %}
-            {% for d in alliances %}
-            {% set other = d.park_b if d.park_a_id == park.id else d.park_a %}
-            <div
-                style="display:flex; justify-content:space-between; align-items:center; padding:3px 0; font-size:12px;">
-                <span>🤝 {{ other.name }}{% if other.is_npc %} <span
-                        style="font-size:9px; color:var(--text-dim);">(NPC)</span>{% endif %}</span>
-                <form method="POST" action="{{ url_for('game.diplomacy_dissolve', diplo_id=d.id) }}">
-                    <button type="submit" class="terminal-btn" style="font-size:9px; padding:1px 4px;">{{
-                        t('diplo.dissolve') }}</button>
-                </form>
+        <!-- Public Trade Market -->
+        <div class="bg-surface border-2 border-outline p-panel-padding space-y-3">
+            <div class="bg-primary text-background px-2 py-1 font-bold text-xs uppercase tracking-wider flex items-center justify-between">
+                <span>🌐 PUBLIC TRADE_MARKET</span>
+                <span class="material-symbols-outlined text-[14px]">public</span>
             </div>
-            {% endfor %}
+            {% if public_trades %}
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 font-code-critical text-xs">
+                {% for trade in public_trades %}
+                <div class="border border-outline bg-surface-container-lowest p-3 flex flex-col justify-between space-y-3">
+                    <div>
+                        <div class="flex justify-between items-start border-b border-outline-variant/30 pb-1.5">
+                            <strong class="text-primary">{{ trade.sender.name }}</strong>
+                            {% if trade.sender.is_npc %}<span class="text-[9px] bg-outline-variant/30 text-outline border border-outline-variant/50 px-1 font-normal">NPC</span>{% endif %}
+                        </div>
+                        {% if trade.message %}
+                        <p class="text-[11px] text-text-dim italic leading-relaxed mt-1 font-label-kr">
+                            "{{ trade.message }}"
+                        </p>
+                        {% endif %}
+                        <div class="space-y-1 mt-2.5 text-[11px]">
+                            <div class="text-accent flex items-center gap-1">
+                                <span class="material-symbols-outlined text-xs">add_circle</span>
+                                {{ t('trade.incoming_receive') }}: {% if trade.offer_konpeito %}🍬{{ trade.offer_konpeito }} {% endif %}{% if trade.offer_trash %}🗑️{{ trade.offer_trash }} {% endif %}{% if trade.offer_material %}🧱{{ trade.offer_material }} {% endif %}{% if trade.offer_babies %}🐛{{ trade.offer_babies }}{% endif %}
+                            </div>
+                            <div class="text-error flex items-center gap-1">
+                                <span class="material-symbols-outlined text-xs">remove_circle</span>
+                                {{ t('trade.incoming_give') }}: {% if trade.request_konpeito %}🍬{{ trade.request_konpeito }} {% endif %}{% if trade.request_trash %}🗑️{{ trade.request_trash }} {% endif %}{% if trade.request_material %}🧱{{ trade.request_material }} {% endif %}{% if trade.request_babies %}🐛{{ trade.request_babies }}{% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    <form method="POST" action="{{ url_for('game.trade_accept', trade_id=trade.id) }}" class="border-t border-outline-variant/20 pt-2.5">
+                        <button type="submit" class="w-full py-1.5 bg-primary-container text-background font-bold text-[10px] uppercase hover:brightness-125 transition-all active:scale-95 text-center">
+                            ✅ {{ t('trade.accept') }}
+                        </button>
+                    </form>
+                </div>
+                {% endfor %}
+            </div>
             {% else %}
-            <div style="color:var(--text-dim); font-size:11px;">{{ t('diplo.no_allies') }}</div>
+            <div class="text-text-dim text-xs text-center py-6 italic font-code-critical">
+                {{ t('trade.no_market') }}
+            </div>
             {% endif %}
         </div>
 
-        <!-- 현재 적대 -->
-        <div style="margin-bottom:10px;">
-            <div style="color:var(--danger); font-size:12px; margin-bottom:4px;">{{ t('diplo.current_enemies') }} ({{
-                enemies|length }})</div>
-            {% if enemies %}
-            {% for d in enemies %}
-            {% set other = d.park_b if d.park_a_id == park.id else d.park_a %}
-            <div
-                style="display:flex; justify-content:space-between; align-items:center; padding:3px 0; font-size:12px;">
-                <span>⚔️ {{ other.name }}{% if other.is_npc %} <span
-                        style="font-size:9px; color:var(--text-dim);">(NPC)</span>{% endif %} <span
-                        style="font-size:9px; color:var(--konpeito);">{{ t('diplo.loot_bonus') }}</span></span>
-                <form method="POST" action="{{ url_for('game.diplomacy_dissolve', diplo_id=d.id) }}">
-                    <button type="submit" class="terminal-btn" style="font-size:9px; padding:1px 4px;">{{
-                        t('diplo.dissolve') }}</button>
-                </form>
+        <!-- Sent Trade Proposals (Outgoing) -->
+        {% if my_outgoing %}
+        <div class="bg-surface border-2 border-outline p-panel-padding space-y-3">
+            <div class="bg-primary text-background px-2 py-1 font-bold text-xs uppercase tracking-wider flex items-center justify-between">
+                <span>📤 MY OUTGOING PROPOSALS ({{ my_outgoing|length }})</span>
+                <span class="material-symbols-outlined text-[14px]">call_made</span>
             </div>
-            {% endfor %}
-            {% else %}
-            <div style="color:var(--text-dim); font-size:11px;">{{ t('diplo.no_enemies') }}</div>
-            {% endif %}
+            <div class="space-y-2 font-code-critical text-xs">
+                {% for trade in my_outgoing %}
+                <div class="border border-outline bg-surface-container-lowest p-3 flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+                    <div class="space-y-1">
+                        <div class="font-bold text-primary flex items-center gap-1">
+                            <span class="material-symbols-outlined text-sm">forward</span>
+                            {% if trade.receiver %}{{ trade.receiver.name }}{% else %}🌐 {{ t('trade.public') }}{% endif %}
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-x-4 text-[11px] text-on-surface-variant">
+                            <span class="text-error font-bold">{{ t('trade.outgoing_to') }}: {% if trade.offer_konpeito %}🍬{{ trade.offer_konpeito }} {% endif %}{% if trade.offer_trash %}🗑️{{ trade.offer_trash }} {% endif %}{% if trade.offer_material %}🧱{{ trade.offer_material }} {% endif %}{% if trade.offer_babies %}🐛{{ trade.offer_babies }}{% endif %}</span>
+                            <span class="text-accent font-bold">{{ t('trade.outgoing_req') }}: {% if trade.request_konpeito %}🍬{{ trade.request_konpeito }} {% endif %}{% if trade.request_trash %}🗑️{{ trade.request_trash }} {% endif %}{% if trade.request_material %}🧱{{ trade.request_material }} {% endif %}{% if trade.request_babies %}🐛{{ trade.request_babies }}{% endif %}</span>
+                        </div>
+                    </div>
+                    <form method="POST" action="{{ url_for('game.trade_cancel', trade_id=trade.id) }}" class="w-full md:w-auto">
+                        <button type="submit" class="w-full md:w-auto px-4 py-1.5 border border-outline text-on-surface-variant hover:bg-outline hover:text-background text-[10px] font-bold transition-all active:scale-95">
+                            {{ t('trade.cancel') }}
+                        </button>
+                    </form>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Tab Content: DIPLOMACY HEADQUARTERS -->
+    <div id="tab-diplo-content" class="hidden space-y-4">
+        <!-- Alliance Requests (Incoming) -->
+        {% if alliance_requests %}
+        <div class="bg-surface border-2 border-outline p-panel-padding space-y-3">
+            <div class="bg-accent text-background px-2 py-1 font-bold text-xs uppercase tracking-wider flex items-center justify-between">
+                <span>🤝 ALLIANCE INCOMING REQUESTS ({{ alliance_requests|length }})</span>
+                <span class="material-symbols-outlined text-[14px]">handshake</span>
+            </div>
+            <div class="space-y-2 font-code-critical text-xs">
+                {% for d in alliance_requests %}
+                <div class="border border-outline bg-surface-container-lowest p-3 flex justify-between items-center">
+                    <span class="font-bold text-primary">🤝 {{ d.park_a.name }}</span>
+                    <div class="flex gap-2">
+                        <form method="POST" action="{{ url_for('game.diplomacy_accept', diplo_id=d.id) }}">
+                            <button type="submit" class="px-4 py-1 bg-primary-container text-background font-bold text-[10px] hover:brightness-125 transition-all active:scale-95">
+                                {{ t('diplo.accept') }}
+                            </button>
+                        </form>
+                        <form method="POST" action="{{ url_for('game.diplomacy_reject', diplo_id=d.id) }}">
+                            <button type="submit" class="px-4 py-1 border border-outline text-on-surface-variant hover:bg-outline hover:text-background text-[10px] font-bold transition-all active:scale-95">
+                                {{ t('diplo.reject') }}
+                            </button>
+                        </form>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Diplomacy Matrix Columns -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- Current Allies -->
+            <div class="bg-surface border-2 border-outline p-panel-padding space-y-3 flex flex-col justify-between">
+                <div>
+                    <div class="bg-primary text-background px-2 py-1 font-bold text-xs uppercase tracking-wider flex items-center justify-between mb-3">
+                        <span>🤝 CURRENT ALLIES ({{ alliances|length }})</span>
+                        <span class="material-symbols-outlined text-[14px]">groups</span>
+                    </div>
+                    <div class="space-y-2 font-code-critical text-xs max-h-48 overflow-y-auto">
+                        {% if alliances %}
+                        {% for d in alliances %}
+                        {% set other = d.park_b if d.park_a_id == park.id else d.park_a %}
+                        <div class="flex justify-between items-center p-2 bg-surface-container-lowest border border-outline">
+                            <span class="font-bold text-mint flex items-center gap-1">
+                                🤝 {{ other.name }}{% if other.is_npc %} <span class="text-[9px] text-text-dim font-normal">(NPC)</span>{% endif %}
+                            </span>
+                            <form method="POST" action="{{ url_for('game.diplomacy_dissolve', diplo_id=d.id) }}">
+                                <button type="submit" class="px-3 py-1 border border-error text-error text-[9px] font-bold hover:bg-error hover:text-white transition-all active:scale-95">
+                                    {{ t('diplo.dissolve') }}
+                                </button>
+                            </form>
+                        </div>
+                        {% endfor %}
+                        {% else %}
+                        <div class="text-text-dim text-xs py-4 text-center italic">{{ t('diplo.no_allies') }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Current Enemies -->
+            <div class="bg-surface border-2 border-outline p-panel-padding space-y-3 flex flex-col justify-between">
+                <div>
+                    <div class="bg-primary text-background px-2 py-1 font-bold text-xs uppercase tracking-wider flex items-center justify-between mb-3">
+                        <span>⚔️ CURRENT ENEMIES ({{ enemies|length }})</span>
+                        <span class="material-symbols-outlined text-[14px]">swords</span>
+                    </div>
+                    <div class="space-y-2 font-code-critical text-xs max-h-48 overflow-y-auto">
+                        {% if enemies %}
+                        {% for d in enemies %}
+                        {% set other = d.park_b if d.park_a_id == park.id else d.park_a %}
+                        <div class="flex justify-between items-center p-2 bg-surface-container-lowest border border-outline">
+                            <div class="flex flex-col">
+                                <span class="font-bold text-error flex items-center gap-1">
+                                    ⚔️ {{ other.name }}{% if other.is_npc %} <span class="text-[9px] text-text-dim font-normal">(NPC)</span>{% endif %}
+                                </span>
+                                <span class="text-[9px] text-accent font-bold mt-0.5">⚠️ {{ t('diplo.loot_bonus') }}</span>
+                            </div>
+                            <form method="POST" action="{{ url_for('game.diplomacy_dissolve', diplo_id=d.id) }}">
+                                <button type="submit" class="px-3 py-1 border border-outline text-on-surface-variant text-[9px] font-bold hover:bg-outline hover:text-background transition-all active:scale-95">
+                                    {{ t('diplo.dissolve') }}
+                                </button>
+                            </form>
+                        </div>
+                        {% endfor %}
+                        {% else %}
+                        <div class="text-text-dim text-xs py-4 text-center italic">{{ t('diplo.no_enemies') }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
         </div>
 
-        <!-- 새 외교 관계 -->
-        <div style="border-top:1px dashed var(--border); padding-top:8px;">
-            <div style="font-size:12px; margin-bottom:6px; color:var(--text-dim);">{{ t('diplo.new_relation') }}</div>
-            <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-                <select id="diplo-target" class="num-input" style="width:180px; text-align:left;">
-                    {% for p in other_parks %}
-                    <option value="{{ p.id }}">{{ p.name }}{% if p.is_npc %} (NPC){% endif %}</option>
-                    {% endfor %}
-                </select>
-                <form method="POST" id="form-ally" style="display:inline;">
-                    <button type="submit" class="terminal-btn btn-primary" style="font-size:10px; padding:2px 8px;">{{
-                        t('diplo.request_ally') }}</button>
-                </form>
-                <form method="POST" id="form-enemy" style="display:inline;">
-                    <button type="submit" class="terminal-btn btn-cull" style="font-size:10px; padding:2px 8px;">{{
-                        t('diplo.declare_enemy') }}</button>
-                </form>
+        <!-- Initiate New Diplomatic Relation -->
+        <div class="bg-surface border-2 border-outline p-panel-padding space-y-4">
+            <div class="bg-primary text-background px-2 py-1 font-bold text-xs uppercase tracking-wider flex items-center justify-between">
+                <span>📡 INITIATE NEW DIPLOMATIC PROTOCOL</span>
+                <span class="material-symbols-outlined text-[14px]">send</span>
+            </div>
+            <div class="font-code-critical text-xs space-y-3.5">
+                <div class="text-text-dim text-[10px] uppercase font-bold">{{ t('diplo.new_relation') }}:</div>
+                <div class="flex flex-col md:flex-row gap-3 items-stretch md:items-center">
+                    <select id="diplo-target" class="bg-surface-container-lowest text-primary border border-outline px-2 py-1.5 focus:ring-0 w-full md:w-64">
+                        {% for p in other_parks %}
+                        <option value="{{ p.id }}">{{ p.name }}{% if p.is_npc %} (NPC){% endif %}</option>
+                        {% endfor %}
+                    </select>
+                    <div class="flex gap-2 flex-grow">
+                        <form method="POST" id="form-ally" class="flex-1">
+                            <button type="submit" class="w-full py-2 bg-primary-container text-background font-bold text-[11px] uppercase hover:brightness-125 transition-all active:scale-95 text-center">
+                                🤝 {{ t('diplo.request_ally') }}
+                            </button>
+                        </form>
+                        <form method="POST" id="form-enemy" class="flex-1">
+                            <button type="submit" class="w-full py-2 bg-error text-white font-bold text-[11px] uppercase hover:brightness-125 transition-all active:scale-95 text-center">
+                                ⚔️ {{ t('diplo.declare_enemy') }}
+                            </button>
+                        </form>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
-</div>
 
-<!-- 네비게이션 -->
-<div style="text-align:center; padding:8px;">
-    <a href="{{ url_for('game.dashboard') }}" class="terminal-btn btn-primary" style="font-size:11px;">← {{
-        t('nav.dashboard') }}</a>
-    <a href="{{ url_for('game.ranking') }}" class="terminal-btn" style="font-size:11px;">{{ t('nav.ranking') }}</a>
-</div>
+    <!-- Navigation Footer -->
+    <footer class="w-full flex justify-center gap-4 py-4">
+        <a href="{{ url_for('game.dashboard') }}" class="px-6 py-2 bg-outline-variant text-[#eeffe4] border border-outline font-bold text-xs uppercase hover:bg-primary hover:text-background transition-all active:scale-95">
+            ← {{ t('nav.dashboard') }}
+        </a>
+        <a href="{{ url_for('game.ranking') }}" class="px-6 py-2 border border-outline-variant text-on-surface-variant font-bold text-xs uppercase hover:bg-surface-container-high hover:text-primary transition-all active:scale-95">
+            {{ t('nav.ranking') }}
+        </a>
+    </footer>
+</main>
 {% endblock %}
 
 {% block scripts %}
 <script>
     (function () {
+        // === 1. 외교 대상 선택 동적 Action 설정 ===
         const diploTarget = document.getElementById('diplo-target');
         const formAlly = document.getElementById('form-ally');
         const formEnemy = document.getElementById('form-enemy');
         function updateDiploForms() {
+            if (!diploTarget || !formAlly || !formEnemy) return;
             const targetId = diploTarget.value;
             formAlly.action = '/game/diplomacy/ally/' + targetId;
             formEnemy.action = '/game/diplomacy/enemy/' + targetId;
         }
-        diploTarget.addEventListener('change', updateDiploForms);
-        updateDiploForms();
+        if (diploTarget) {
+            diploTarget.addEventListener('change', updateDiploForms);
+            updateDiploForms();
+        }
+
+        // === 2. BBS 탭 동적 스위칭 (교역소 vs 외교본부) ===
+        const tabTradeBtn = document.getElementById('tab-trade-btn');
+        const tabDiploBtn = document.getElementById('tab-diplo-btn');
+        const tabTradeContent = document.getElementById('tab-trade-content');
+        const tabDiploContent = document.getElementById('tab-diplo-content');
+
+        if (tabTradeBtn && tabDiploBtn && tabTradeContent && tabDiploContent) {
+            tabTradeBtn.addEventListener('click', () => {
+                // 활성화 변경
+                tabTradeBtn.className = "px-6 py-3 bg-primary-container text-background font-bold text-xs uppercase border-t-2 border-x-2 border-outline-variant mr-1 transition-all active:scale-95";
+                tabDiploBtn.className = "px-6 py-3 bg-surface text-on-surface-variant font-bold text-xs uppercase border-t-2 border-x border-outline-variant/30 transition-all hover:bg-surface-container-high hover:text-primary active:scale-95";
+                
+                // 콘텐츠 보이기
+                tabTradeContent.classList.remove('hidden');
+                tabDiploContent.classList.add('hidden');
+            });
+
+            tabDiploBtn.addEventListener('click', () => {
+                // 활성화 변경
+                tabDiploBtn.className = "px-6 py-3 bg-primary-container text-background font-bold text-xs uppercase border-t-2 border-x-2 border-outline-variant mr-1 transition-all active:scale-95";
+                tabTradeBtn.className = "px-6 py-3 bg-surface text-on-surface-variant font-bold text-xs uppercase border-t-2 border-x border-outline-variant/30 transition-all hover:bg-surface-container-high hover:text-primary active:scale-95";
+                
+                // 콘텐츠 보이기
+                tabDiploContent.classList.remove('hidden');
+                tabTradeContent.classList.add('hidden');
+            });
+        }
     })();
 </script>
 {% endblock %}

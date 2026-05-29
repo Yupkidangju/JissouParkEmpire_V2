@@ -23,27 +23,41 @@
 }
 
 :root {
-    --bg: #0a0a0a;
-    --bg-box: #0d1a0d;
-    --text: #33ff33;
-    --text-dim: #1a8c1a;
-    --text-bright: #88ff88;
+    --bg: #050505;
+    --bg-box: #131313;
+    --text: #eeffe4;
+    --text-dim: #85967d;
+    --text-bright: #33ff33;
     --accent: #ffaa00;
     --accent-glow: #ffd700;
     --danger: #ff4444;
-    --danger-dim: #8b0000;
-    --mint: #00ff88;
-    --border: #225522;
-    --border-bright: #33aa33;
+    --danger-dim: #93000a;
+    --mint: #00e61b;
+    --border: #3c4b36;
+    --border-bright: #85967d;
     --konpeito: #ffd700;
-    --trash: #888888;
-    --meat: #ff6b35;
-    --material: #cc8844;
+    --trash: #baccb1;
+    --meat: #ffb4ab;
+    --material: #ffcf90;
     --morale-low: #ff4444;
     --morale-mid: #ffaa00;
     --morale-high: #33ff33;
     --font-mono: 'IBM Plex Mono', 'D2Coding', 'Consolas', monospace;
     --font-ui: 'Noto Sans KR', 'IBM Plex Mono', sans-serif;
+}
+
+@keyframes flicker {
+    0% { opacity: 0.97; }
+    5% { opacity: 0.92; }
+    10% { opacity: 0.98; }
+    15% { opacity: 0.94; }
+    20% { opacity: 0.99; }
+    100% { opacity: 1; }
+}
+
+@keyframes scanline {
+    0% { transform: translateY(-100%); }
+    100% { transform: translateY(100%); }
 }
 
 body {
@@ -54,22 +68,32 @@ body {
     line-height: 1.6;
     min-height: 100vh;
     overflow-x: hidden;
+    animation: flicker 0.15s infinite;
 }
 
-/* === CRT 스캔라인 오버레이 === */
+/* === CRT 스캔라인 & 플리커 오버레이 === */
 .crt-overlay {
     position: fixed;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
-    background: repeating-linear-gradient(0deg,
-            transparent,
-            transparent 2px,
-            rgba(0, 0, 0, 0.15) 2px,
-            rgba(0, 0, 0, 0.15) 4px);
+    background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+    background-size: 100% 4px, 3px 100%;
     pointer-events: none;
     z-index: 9999;
+}
+
+.scanline-effect {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100px;
+    background: linear-gradient(to bottom, transparent, rgba(51, 255, 51, 0.05), transparent);
+    animation: scanline 8s linear infinite;
+    pointer-events: none;
+    z-index: 10000;
 }
 
 /* === 터미널 컨테이너 === */

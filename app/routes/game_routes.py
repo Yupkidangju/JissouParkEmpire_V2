@@ -1043,3 +1043,15 @@ def diplomacy_dissolve(diplo_id):
     flash(get_text('flash.diplo_break'), 'info')
     return redirect(url_for('game.trade_market'))
 
+
+@game_bp.route('/skills', methods=['GET'])
+@login_required
+def skills_tree():
+    """보스 스킬 트리 터미널 (가상 모크업 이스터에그) [v1.7.0]"""
+    park = current_user.park
+    return render_template(
+        'skills.html',
+        park=park
+    )
+
+

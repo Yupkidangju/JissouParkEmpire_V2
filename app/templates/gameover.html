@@ -1,49 +1,84 @@
 {% extends "base.html" %}
 {% block title %}{{ t('gameover.title') }} - {{ t('site.title') }}{% endblock %}
+
 {% block content %}
-<div class="gameover-screen">
-    <div class="terminal-box">
-        <div class="gameover-logo">
-            <div class="gameover-face">( x _ x )</div>
-            <pre class="gameover-art">
- ██████╗  █████╗ ███╗   ███╗███████╗
-██╔════╝ ██╔══██╗████╗ ████║██╔════╝
-██║  ███╗███████║██╔████╔██║█████╗
-██║   ██║██╔══██║██║╚██╔╝██║██╔══╝
-╚██████╔╝██║  ██║██║ ╚═╝ ██║███████╗
- ╚═════╝ ╚═╝  ╚═╝╚═╝     ╚═╝╚══════╝
- ██████╗ ██╗   ██╗███████╗██████╗
-██╔═══██╗██║   ██║██╔════╝██╔══██╗
-██║   ██║██║   ██║█████╗  ██████╔╝
-██║   ██║╚██╗ ██╔╝██╔══╝  ██╔══██╗
-╚██████╔╝ ╚████╔╝ ███████╗██║  ██║
- ╚═════╝   ╚═══╝  ╚══════╝╚═╝  ╚═╝
+<style>
+    @keyframes glitch {
+        0% { text-shadow: 2px 0 #00ff00, -2px 0 #ff0000; }
+        50% { text-shadow: -2px 0 #00ff00, 2px 0 #ff0000; }
+        100% { text-shadow: 2px 0 #00ff00, -2px 0 #ff0000; }
+    }
+    .glitch-art {
+        animation: glitch 0.5s infinite;
+        color: #ffdad6;
+    }
+    .inner-glow-danger {
+        box-shadow: inset 0 0 30px rgba(147, 0, 10, 0.4);
+    }
+</style>
+
+<main class="max-w-4xl mx-auto p-4 flex items-center justify-center min-h-[85vh]">
+    <div class="w-full bg-[#1c1b1b] border-4 border-error p-6 md:p-10 inner-glow-danger space-y-6 text-center">
+        <!-- grotesque Collapse ASCII Art and Emoticon -->
+        <div class="space-y-4">
+            <div class="text-error text-5xl md:text-6xl font-bold font-code-critical animate-pulse">( X _ X )</div>
+            <pre class="glitch-art font-code-critical text-[10px] md:text-xs leading-tight mx-auto block max-w-full overflow-x-auto whitespace-pre p-2 bg-black/40 border border-error/20">
+ ██████╗  █████╗ ███╗   ███╗███████╗    ██████╗ ██╗   ██╗███████╗██████╗
+██╔════╝ ██╔══██╗████╗ ████║██╔════╝   ██╔═══██╗██║   ██║██╔════╝██╔══██╗
+██║  ███╗███████║██╔████╔██║█████╗     ██║   ██║██║   ██║█████╗  ██████╔╝
+██║   ██║██╔══██║██║╚██╔╝██║██╔══╝     ██║   ██║╚██╗ ██╔╝██╔══╝  ██╔══██╗
+╚██████╔╝██║  ██║██║ ╚═╝ ██║███████╗   ╚██████╔╝ ╚████╔╝ ███████╗██║  ██║
+ ╚═════╝ ╚═╝  ╚═╝╚═╝     ╚═╝╚══════╝    ╚═════╝   ╚═══╝  ╚══════╝╚═╝  ╚═╝
             </pre>
+            <div class="text-error font-code-critical text-xs tracking-widest font-bold animate-pulse">
+                [ SYSTEM_CRITICAL: EMPIRE_COLLAPSE_DETECTED ]
+            </div>
         </div>
-        <div class="gameover-text">
-            <h2>{{ park.name }}</h2>
-            <p class="death-speech">"{{ t('gameover.speech1') }}"</p>
-            <p class="death-speech">"{{ t('gameover.speech2') }}"</p>
-            <div class="gameover-stats">
-                <div class="stat-line">{{ t('gameover.survive_turns') }}: <strong>{{ park.turn_count }}</strong></div>
-                <div class="stat-line">{{ t('gameover.final_guards') }}: <strong>{{ park.guard_count }}</strong></div>
-                <div class="stat-line">{{ t('gameover.final_adults') }}: <strong>{{ park.adult_count }}</strong></div>
-                <div class="stat-line">{{ t('gameover.final_children') }}: <strong>{{ park.child_count }}</strong></div>
+
+        <!-- Death Stats -->
+        <div class="space-y-4 max-w-md mx-auto">
+            <h2 class="font-display-lg text-2xl font-bold text-error uppercase tracking-tighter">{{ park.name }}</h2>
+            <div class="bg-black/60 border-2 border-error/30 p-4 font-label-kr text-xs text-[#ffdad6] space-y-2 italic leading-relaxed">
+                <p>"{{ t('gameover.speech1') }}"</p>
+                <p>"{{ t('gameover.speech2') }}"</p>
             </div>
-            <p class="death-info" style="margin-top:12px; color:#666; font-size:11px;">
-                {{ t('gameover.destroyed_at', turn=park.turn_count) }}
-            </p>
-            <div style="margin-top: 16px; display: flex; gap: 10px; justify-content: center;">
-                <form method="POST" action="{{ url_for('game.restart') }}">
-                    <button type="submit" class="terminal-btn btn-primary" style="font-size:14px; padding:8px 20px;">
-                        {{ t('gameover.restart') }}
-                    </button>
-                </form>
-                <a href="{{ url_for('game.ranking') }}" class="terminal-btn" style="font-size:14px; padding:8px 20px;">
-                    {{ t('nav.ranking') }}
-                </a>
+            
+            <div class="border border-error/30 bg-[#93000a]/10 p-4 font-code-critical text-xs space-y-2">
+                <div class="flex justify-between border-b border-error/20 pb-1">
+                    <span class="text-on-surface-variant">⏳ {{ t('gameover.survive_turns') }}</span>
+                    <strong class="text-error">{{ park.turn_count }} Turns</strong>
+                </div>
+                <div class="flex justify-between border-b border-error/20 pb-1">
+                    <span class="text-on-surface-variant">💂 {{ t('gameover.final_guards') }}</span>
+                    <strong class="text-[#ffdad6]">{{ park.guard_count }}</strong>
+                </div>
+                <div class="flex justify-between border-b border-error/20 pb-1">
+                    <span class="text-on-surface-variant"> 성체 {{ t('gameover.final_adults') }}</span>
+                    <strong class="text-[#ffdad6]">{{ park.adult_count }}</strong>
+                </div>
+                <div class="flex justify-between border-b border-error/20 pb-1">
+                    <span class="text-on-surface-variant">👶 {{ t('gameover.final_children') }}</span>
+                    <strong class="text-[#ffdad6]">{{ park.child_count }}</strong>
+                </div>
+                <div class="text-[10px] text-text-dim text-left pt-2 leading-relaxed">
+                    ⚙️ SYSTEM_CRASH_INFO: {{ t('gameover.destroyed_at', turn=park.turn_count) }}
+                </div>
             </div>
+        </div>
+
+        <!-- Re-ignition & Restart Options -->
+        <div class="flex flex-col sm:flex-row gap-3 justify-center max-w-sm mx-auto pt-4 font-code-critical text-xs">
+            <form method="POST" action="{{ url_for('game.restart') }}" class="w-full">
+                <button type="submit" class="w-full py-3 bg-error text-white font-bold uppercase hover:brightness-125 transition-all active:scale-95 border-b-4 border-error-container active:border-b-0 active:translate-y-0.5 flex items-center justify-center gap-2">
+                    <span class="material-symbols-outlined text-sm font-bold animate-spin">refresh</span>
+                    {{ t('gameover.restart') }}
+                </button>
+            </form>
+            <a href="{{ url_for('game.ranking') }}" class="w-full py-3 border border-error text-error font-bold uppercase hover:bg-error hover:text-white transition-all active:scale-95 text-center flex items-center justify-center gap-2">
+                <span class="material-symbols-outlined text-sm">leaderboard</span>
+                {{ t('nav.ranking') }}
+            </a>
         </div>
     </div>
-</div>
+</main>
 {% endblock %}
