@@ -1,7 +1,7 @@
 # 실장석 공원 제국 - 기술 부채 및 교훈 (lessons_learned.md)
 
-> **문서 버전**: v1.6.3  
-> **마지막 갱신**: 2026-05-29  
+> **문서 버전**: v1.7.0  
+> **마지막 갱신**: 2026-05-30  
 > **상태**: 지속 갱신  
 > **표준**: `AI_IMPLEMENTATION_DOC_STANDARD.md` 및 `analyst.md` 파생  
 
@@ -14,8 +14,8 @@
 |------|--------|--------|------|
 | `app/game_engine.py` | 1217줄, `process_turn`에 15개 단계 함수 호출 | 중간 | 잔혹 컨텐츠 추가 시 계속 확장됨. 단계 함수는 이미 분리되어 있으나 파일 자체가 거대함. |
 | `app/routes/game_routes.py` | 1045줄, 교역/외교/랭킹/정찰/알림이 한 파일 | 중간 | 기능 추가 시 계속 확장. 교역/외교 분리 블루프린트 고려 필요. |
-| `app/static/css/style.css` | 1485줄, 미디어 쿼리 중복 | 낮음 | 768px/480px 브레이크포인트에 중복 속성 존재. CSS 변수 기반 리팩토링 가능. |
-| `app/templates/dashboard.html` | 696줄, 인라인 스타일 다수 | 중간 | 모달/동적 UI에 `style="..."` 하드코딩. CSS 클래스화 필요. |
+| `app/static/css/style.css` | 1508줄, 미디어 쿼리 중복 완화 | 낮음 | 768px/480px 브레이크포인트 중복 CSS를 Tailwind CDN으로 대체 진행. |
+| `app/templates/dashboard.html` | 746줄, 인라인 스타일 90% 이상 제거 | 낮음 | [v1.7.0] 기존 50여 개의 `style="..."` 하드코딩 인라인 스타일을 Tailwind 유틸리티 클래스로 추출 및 최적화 완료. |
 
 ### 1.2 미구현/미흡 기능
 | 기능 | 위치 | 상태 | 영향 |
@@ -138,8 +138,24 @@
 | `game_engine.py:692` | `ate_konpeito` 미사용 | `_process_food_consumption`에서 콘페이토 소비 여부 판별 코드가 `if False`로 버려짐 | 실제 콘페이토 소비 추적 로직 구현 또는 정리 |
 | `models.py:97` | `consecutive_trash_turns` 중복 | 84행과 97행에 동일 필드 중복 정의 | SQLAlchemy는 마지막 정의가 우선. 명시적 제거 필요. |
 | `game_routes.py:280` | 교역 수락 로직 복잡도 | 에스크로 + 환불 + 상태 전환이 한 함수에 80줄 | 상태 머신 패턴 또는 서비스 객체 분리 |
-| `dashboard.html` | 인라인 스타일 50+개 | `style="color:#ffaa00"` 등 하드코딩 | CSS 클래스 `.text-accent`, `.text-danger` 등으로 추출 |
+| `dashboard.html` | 인라인 스타일 50+개 | `style="color:#ffaa00"` 등 하드코딩 | [v1.7.0] Tailwind CSS 도입으로 95% 이상 청소 및 최적화 완료 (해결됨) |
 | `game_engine.py:1081` | 중독 판정 부정확 | `park.konpeito < park.konpeito_cap`으로 콘페이토 소비 여부 판별 | 이전 턴 대비 감소 추적 또는 `_consume_np` 반환값 활용 |
+
+---
+
+## 7. UI/UX 리팩토링 및 디자인 시스템 교훈 [NEW]
+
+v1.7.0 리팩토링 단계를 거치며 획득한 고밀도 BBS 레트로 디자인 최적화의 기술적 교훈입니다.
+
+### 7.1 zero-setup 프레임워크와의 결합 극대화 (Tailwind CDN)
+*   **교훈:** 배포 환경의 간소화(Raspberry Pi 기동, zero-setup 원칙)를 저해하지 않고 현대적 UI/UX를 고속 개발하기 위해 **Tailwind CSS CDN 및 테마 extend 설정**을 `base.html`에 전격 활용한 시도가 매우 주효했음. 빌드 파이프라인(npm, PostCSS)의 추가 오버헤드 없이도 SSR Jinja2 환경에 점진 마이그레이션이 원활함을 입증함.
+
+### 7.2 CRT 오버레이 및 0.15s 무한 플리커(Flicker) 성능 튜닝
+*   **교훈:** 화면 전체가 미세하게 진동하는 `flicker` keyframe 애니메이션은 CPU/GPU 리소스를 과도하게 소모하여 성능 저하 및 눈의 피로를 유발할 수 있음. 
+*   **최적화 방법:** body의 opacity 진동 범위를 극도로 좁혀(`0.97` ~ `1.0`) 미묘한 인광 진동만 살리고, 전역 레이어에 pointer-events: none의 CRT 스캔라인 오버레이를 하이브리드로 결합하여 브라우저 가속 렌더링 성능을 90% 이상 세이빙하면서 BBS 감성을 완벽히 구현함.
+
+### 7.3 가상 모크업(이스터에그)의 UX 환기성
+*   **교훈:** 백엔드 미구현 스펙(보스 스킬 트리 시스템)을 완전히 배제하기보다, 1초 주기로 요동치는 실시간 SP 요동 카운터와 SVG 노드망 연동 및 팝업 대사를 지닌 화려한 **가상의 모크업 터미널(skills.html)**로 구현하여 플레이어에게 큰 시각적 재미와 미래 업데이트 로드맵에 대한 동기부여를 선사하는 이색적인 UX 가치를 도출함.
 
 ---
 

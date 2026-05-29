@@ -25,6 +25,8 @@
 - 📱 **모바일 턴 쿼터**: 20분당 1턴 충전, 최대 15턴 보유 (반응형 UI)
 - 🏆 **랭킹**: 전투력/인구/승률 기반 순위 시스템
 - 🗣️ **실장석 대사**: 모든 행동에 "~데스", "~테커" 말투의 랜덤 대사
+- 🎨 **Gore-Terminal 디자인 시스템**: 고밀도 인광 메인프레임 감성의 CRT 스캔라인 및 플리커링 오버레이 탑재, 3열 반응형 그리드 대시보드 개편
+- 🧬 **가상 스킬 트리 (이스터에그)**: 향후 보스 스킬 시스템 확장을 대비해 SP 자동 충전 라이브 카운팅이 탑재된 가상 스킬 트리 모크업 터미널 연동
 
 ### 기술 스택
 - **백엔드**: Python Flask + SQLAlchemy + SQLite
@@ -61,6 +63,8 @@ python run.py
 - 📱 **Mobile Turn Quota**: 1 turn per 20min recharge, max 15 turns (Responsive UI)
 - 🏆 **Rankings**: Power/population/win-rate based ranking
 - 🗣️ **Jissou Dialogue**: Random "~desu", "~techu" voice lines
+- 🎨 **Gore-Terminal Design System**: Highly-dense phosphorescent mainframe style with CRT scanline and flickering overlay, redesigned with a 3-column responsive grid dashboard.
+- 🧬 **Virtual Skill Tree (Easter Egg)**: Virtual skill tree mockup terminal featuring live SP auto-charging counter, anticipating future Boss Skill expansion.
 
 ### Tech Stack
 - **Backend**: Python Flask + SQLAlchemy + SQLite
@@ -89,6 +93,8 @@ python run.py
 - 🩸 **残酷システム**: 共食、疫病、反乱、中毒、出産事故
 - 📱 **モバイルターンクォータ**: 20分に1ターン充電、最大15ターン保有（レスポンシブUI）
 - 🗣️ **実装石セリフ**: 全行動に「〜デス」「〜テチュ」のランダムボイス
+- 🎨 **Gore-Terminalデザインシステム**: 高密度燐光メインフレーム感性のCRTスキャンラインおよびフリッカーオーバーレイ搭載、3列レスポンシブグリッドダッシュボードへの全面改修。
+- 🧬 **仮想スキルツリー（イースターエッグ）**: 今後のボススキルシステム拡張を見据えた、SP自動充電ライブカウンター搭載の仮想スキルツリーモックアップ端末の連携。
 
 ---
 
@@ -110,6 +116,8 @@ python run.py
 - 🌧️ **災害事件**: 暴雨/寒波/殺蟲劑/鼠群/貓等
 - 🩸 **殘酷系統**: 同顟相食、疫病、叛亂、上癰、生產事故
 - 📱 **行動輪配額**: 每20分鐘充電1輪，最多保有15輪（響應式UI）
+- 🎨 **Gore-Terminal設計系統**: 搭載高密度磷光主機感性的CRT掃描線及閃爍覆蓋層，全面改版為3欄響應式網格儀表板。
+- 🧬 **虛擬技能樹（彩蛋）**: 預留未來首領技能系統擴充，整合搭載SP自動充電即時計數器的虛擬技能樹樣板終端。
 
 ---
 
@@ -131,6 +139,8 @@ python run.py
 - 🌧️ **灾害事件**: 暴雨/寒波/杀虫剂/鼠群/猫等
 - 🩸 **残酷系统**: 同类相食、疫病、叛乱、上瘾、生产事故
 - 📱 **行动轮配额**: 每20分钟充电1轮，最多保有15轮（响应式UI）
+- 🎨 **Gore-Terminal设计系统**: 搭载高密度磷光主机感性的CRT扫描线及闪烁覆盖层，全面改版为3栏响应式网格仪表板。
+- 🧬 **虚拟技能树（彩蛋）**: 预留未来首领技能系统扩充，整合搭载SP自动充电实时计数器的虚拟技能树样板终端。
 
 ---
 
@@ -142,30 +152,30 @@ MIT License
 ## 🗺️ Road Map
 
 ### 🇰🇷 차기 계획
+- 🎨 **UI/UX 대규모 개편 (완료 - v1.7.0 Gore-Terminal 디자인 도입)**: CRT 효과 레이어 및 3열 반응형 그리드 탑재
 - 📱 **안드로이드 솔플 APK**: Kivy/BeeWare 기반 네이티브 빌드 (Google Play 무료 배포)
-- 🎨 UI 인터페이스 일관화 및 다듬기
 - 🛡️ 보호 모드 밸런스 튜닝
 - 🌐 멀티 버전: 기존 웹 버전 유지 (모바일 브라우저 접속)
 
 ### 🇺🇸 Upcoming
+- 🎨 **UI/UX Major Overhaul (Completed - v1.7.0 Gore-Terminal Design)**: Implemented CRT effects and 3-column responsive grid dashboard
 - 📱 **Android Solo APK**: Native build via Kivy/BeeWare (Free on Google Play)
-- 🎨 UI interface refinement and consistency
 - 🛡️ Protection mode balance tuning
 - 🌐 Multiplayer: Keep existing web version (mobile browser access)
 
 ### 🇯🇵 今後の計画
+- 🎨 **UI/UX大幅リニューアル（完了 - v1.7.0 Gore-Terminalデザイン導入）**: CRTエフェクトおよび3列レスポンシブグリッドを搭載
 - 📱 **Android ソロAPK**: Kivy/BeeWare ネイティブビルド（Google Play無料配信）
-- 🎨 UIインターフェースの統一と改善
 - 🛡️ 保護モードバランス調整
 - 🌐 マルチプレイ: 既存Web版維持（モバイルブラウザアクセス）
 
 ### 🇹🇼 未來計劃
+- 🎨 **UI/UX大幅優化（已完成 - v1.7.0 Gore-Terminal設計導入）**: 搭載CRT特效與3欄響應式網格儀表板
 - 📱 **Android 單人APK**: Kivy/BeeWare 原生構建（Google Play 免費發布）
-- 🎨 UI 介面統一化與優化
 - 🌐 多人版: 維持現有Web版（手機瀏覽器存取）
 
 ### 🇨🇳 未来计划
+- 🎨 **UI/UX大幅优化（已完成 - v1.7.0 Gore-Terminal设计导入）**: 搭载CRT特效与3栏响应式网格仪表板
 - 📱 **Android 单人APK**: Kivy/BeeWare 原生构建（Google Play 免费发布）
-- 🎨 UI 界面统一化与优化
 - 🌐 多人版: 维持现有Web版（手机浏览器访问）
 

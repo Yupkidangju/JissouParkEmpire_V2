@@ -9,13 +9,19 @@
 ### 예정됨 (Planned)
 - **Phase 9: 안드로이드 솔플 APK 빌드** (Kivy/BeeWare 기반)
 
+## [1.7.0] - 2026-05-30
+
+### 추가됨 (Added)
+- **가상 스킬 트리 터미널**: 향후 시스템 확장을 대비해 SP 자동 충전 라이브 카운터가 탑재된 이스터에그 모크업 페이지 `skills.html` 신설 및 네비게이션 연동
+
+### 변경됨 (Changed)
+- **디자인 시스템 갱신**: Tailwind CSS CDN을 `base.html`에 전격 도입하고 고밀도 인광 메인프레임 감성의 **Gore-Terminal** 테마 구축
+- **대시보드 리팩토링**: `dashboard.html`을 3열 반응형 그리드로 전면 개편하고 실장석 도트 아바타와 6단 AP 게이지 바 탑재
+- **교역/외교 UI 고도화**: `trade.html`을 고밀도 BBS 탭 UI로 마이그레이션하여 모달 및 게이지 비주얼 텐션 강화
+- **멸망 화면 리팩토링**: `gameover.html`을 시스템 에러 붉은 글리치 비주얼로 리디자인
+
 ### 문서화 (Documentation)
-- **마스터 스펙 역설계**: `spec.md` 신규 작성 — 코드베이스 기반 하이레벨 아키텍처, 타입 계약, 동결 공식, 실데이터 기준표 포함
-- **UI/UX 설계도 역설계**: `designs.md` 신규 작성 — 화면 흐름, 레이어 구조, 컬러 토큰, 버튼 정책, 반응형 규칙 포함
-- **구현 요약 역설계**: `implementation_summary.md` 신규 작성 — 시스템 분해, 파일 책임, 알고리즘 메모, 구현 순서 포함
-- **설계 결정 기록**: `DESIGN_DECISIONS.md` 신규 작성 — Flask/SQLite, SSR, AP+턴쿼터, 에스크로, 보호모드 등 12개 결정의 Why 기록
-- **감사 로드맵**: `audit_roadmap.md` 신규 작성 — 정합성/위험/아키텍처 감사 기준, 체크포인트 10개, 잔여 리스크 7개
-- **기술 부채 및 교훈**: `lessons_learned.md` 신규 작성 — 14개 Exploit 히스토리, 코드 냄새 5개, 성능 이슈, 개발 프로세스 교훈
+- **리팩토링 계획 설계 및 구현 완료 동기화**: `spec.md`, `designs.md`, `DESIGN_DECISIONS.md`, `implementation_summary.md`, `audit_roadmap.md`, `lessons_learned.md`에 최종 마일스톤 구현 라인수 및 CRT 렌더링 성능 최적화와 가상 스킬 트리 이스터에그의 디자인 교훈을 100% 동기화함
 
 ## [1.6.3] - 2026-02-21
 

@@ -11,12 +11,57 @@
     <link
         href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&family=Noto+Sans+KR:wght@400;700&display=swap"
         rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "on-background": "#e5e2e1",
+                        "error-container": "#93000a",
+                        "inverse-primary": "#006e06",
+                        "on-primary-container": "#007207",
+                        "background": "#050505",
+                        "primary-fixed-dim": "#00e61b",
+                        "outline": "#3c4b36",
+                        "primary": "#eeffe4",
+                        "primary-container": "#33ff33",
+                        "surface": "#131313",
+                        "on-surface-variant": "#baccb1",
+                        "outline-variant": "#3c4b36",
+                        "surface-container-lowest": "#0e0e0e",
+                    },
+                    spacing: {
+                        "unit": "4px",
+                        "panel-padding": "12px",
+                    },
+                    fontFamily: {
+                        "display-lg": ["IBM Plex Mono"],
+                        "headline-md": ["IBM Plex Mono"],
+                        "code-critical": ["IBM Plex Mono"],
+                        "label-kr": ["Noto Sans KR"],
+                        "body-base": ["IBM Plex Mono"]
+                    },
+                    fontSize: {
+                        "display-lg": ["48px", {"lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                        "headline-md": ["24px", {"lineHeight": "1.2", "fontWeight": "600"}],
+                        "code-critical": ["12px", {"lineHeight": "1.2", "fontWeight": "700"}],
+                        "label-kr": ["13px", {"lineHeight": "1.4", "letterSpacing": "0.05em", "fontWeight": "500"}],
+                        "body-base": ["14px", {"lineHeight": "1.6", "fontWeight": "400"}]
+                    }
+                }
+            }
+        }
+    </script>
 </head>
 
-<body>
-    <!-- CRT 스캔라인 오버레이 -->
+<body class="selection:bg-primary-container selection:text-on-primary-container">
+    <!-- CRT 스캔라인 및 플리커 오버레이 -->
     <div class="crt-overlay"></div>
+    <div class="scanline-effect"></div>
 
     <div class="terminal-container">
         {# [v1.0.0] 언어 선택 드롭다운 #}

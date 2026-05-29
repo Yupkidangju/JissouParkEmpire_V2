@@ -1,377 +1,581 @@
 {% extends "base.html" %}
 {% block title %}{{ park.name }} - {{ t('site.title') }}{% endblock %}
 {% block content %}
-<div class="dashboard">
-    {# === 상단 헤더 === #}
-    <div class="terminal-box header-box">
-        <div class="header-row">
-            <span>🏕️ <strong>{{ park.name }}</strong></span>
-            <span>👑 {{ current_user.username }}</span>
-            <span>{{ t('dash.turn') }}: {{ park.turn_count }}</span>
-            <span>⚡ AP: <strong class="ap-count">{{ park.action_points }}/3</strong></span>
-            <a href="{{ url_for('auth.logout') }}" class="logout-link">[{{ t('nav.logout') }}]</a>
-        </div>
-        {# [v1.2.0] 턴 쿼터 게이지 #}
-        <div class="turn-quota-bar">
-            <span class="turn-label">⚡ {{ t('dash.turn') }}:</span>
-            <div class="turn-gauge">
-                <div class="turn-gauge-fill" style="width: {{ (turn_info.quota / turn_info.max * 100)|int }}%"></div>
-                <span class="turn-gauge-text">{{ turn_info.quota }} / {{ turn_info.max }}</span>
+<main class="max-w-7xl mx-auto p-2 md:p-4 space-y-4">
+    <!-- TopAppBar (Dashboard Header) -->
+    <header class="w-full flex flex-col md:flex-row justify-between items-start md:items-center p-panel-padding bg-surface border-2 border-outline inner-glow-primary gap-4">
+        <div class="flex flex-col md:flex-row md:items-center gap-4 w-full md:w-auto">
+            <h2 class="font-display-lg text-[22px] md:text-[28px] font-bold text-primary uppercase tracking-tighter glow-sm flex items-center gap-2">
+                🏕️ <span class="text-primary-container">{{ park.name }}</span>
+            </h2>
+            <div class="flex flex-wrap gap-2 font-code-critical text-[11px]">
+                <span class="text-on-surface-variant border border-outline-variant px-2 py-1 flex items-center gap-1">
+                    <span class="material-symbols-outlined text-xs">person</span>
+                    {{ current_user.username }}
+                </span>
+                <span class="text-primary-container border border-primary-container px-2 py-1 flex items-center gap-1">
+                    <span class="material-symbols-outlined text-xs">hourglass_empty</span>
+                    {{ t('dash.turn') }}: {{ park.turn_count }}
+                </span>
+                <span class="{% if park.action_points == 0 %}text-error animate-pulse border-error{% else %}text-mint border-outline-variant{% endif %} border px-2 py-1 flex items-center gap-1 font-bold">
+                    <span class="material-symbols-outlined text-xs">bolt</span>
+                    AP: {{ park.action_points }}/3
+                </span>
             </div>
+        </div>
+        <div class="flex items-center justify-between md:justify-end gap-4 w-full md:w-auto border-t md:border-t-0 border-outline-variant/30 pt-3 md:pt-0">
+            <div class="text-left md:text-right">
+                <div class="font-bold text-primary text-xs uppercase">{{ t('parks.player') }}</div>
+                <div class="font-code-critical text-[10px] text-on-surface-variant">
+                    {% if park.total_combat_power > 500 %}⚔️ LV.3 SEREB BOSS{% else %}🌱 LV.1 BOSS{% endif %}
+                </div>
+            </div>
+            <a href="{{ url_for('auth.logout') }}" class="font-code-critical text-xs text-error hover:text-white border border-error/50 hover:bg-error px-3 py-1.5 transition-all">
+                [{{ t('nav.logout') }}]
+            </a>
+        </div>
+    </header>
+
+    <!-- Turn Quota Gauge Bar -->
+    <div class="w-full bg-surface-container-lowest border-2 border-outline-variant p-3 flex flex-col md:flex-row items-center justify-between gap-4">
+        <div class="flex items-center gap-3 w-full md:w-auto">
+            <span class="material-symbols-outlined text-primary-container animate-pulse" data-icon="update">update</span>
+            <span class="font-code-critical text-xs text-primary uppercase tracking-widest">
+                {{ t('dash.turn') }} QUOTA:
+            </span>
+            <div class="flex-grow md:w-48 h-4 bg-surface border border-outline-variant relative overflow-hidden">
+                <div class="h-full bg-primary-container" style="width: {{ (turn_info.quota / turn_info.max * 100)|int }}%"></div>
+                <span class="absolute inset-0 flex items-center justify-center font-code-critical text-[10px] text-white font-bold">
+                    {{ turn_info.quota }} / {{ turn_info.max }}
+                </span>
+            </div>
+        </div>
+        <div class="flex items-center gap-2 font-code-critical text-xs">
             {% if not turn_info.is_full %}
-            <span class="turn-timer" id="turnTimer" data-seconds="{{ turn_info.next_regen_seconds }}">
-                {{ t('dash.next_charge') }}: <span id="turnCountdown">--:--</span>
+            <span class="text-on-surface-variant flex items-center gap-1" id="turnTimer" data-seconds="{{ turn_info.next_regen_seconds }}">
+                <span class="material-symbols-outlined text-[14px]">schedule</span>
+                {{ t('dash.next_charge') }}: <strong class="text-primary-container" id="turnCountdown">--:--</strong>
             </span>
             {% else %}
-            <span class="turn-full">✨ {{ t('dash.full') }}</span>
+            <span class="text-mint flex items-center gap-1">
+                <span class="material-symbols-outlined text-[14px]">done_all</span>
+                {{ t('dash.full') }}
+            </span>
             {% endif %}
         </div>
     </div>
 
-    {# [v1.3.0] 보호 모드 배너 #}
+    <!-- Protection Active Banner (Conditional) -->
     {% if protect_info.is_protected %}
-    <div class="terminal-box" style="border-color: #ffaa00; background: rgba(255,170,0,0.08);">
-        <div class="box-header" style="color: #ffaa00;">{{ t('protect.title') }}</div>
-        <div class="box-content" style="font-size: 12px;">
-            <p style="color: #ffaa00; margin: 0 0 6px 0;">
-                {{ t('protect.desc') }}
-            </p>
-            <div style="display: flex; gap: 16px; flex-wrap: wrap;">
-                <span>{{ t('protect.guards') }}: <strong
-                        style="color: {% if protect_info.guard_need > 0 %}#ff6666{% else %}#00ff41{% endif %}">
-                        {{ protect_info.guard_current }}/{{ protect_info.guard_min }}</strong>
-                    {% if protect_info.guard_need > 0 %}({{ t('protect.need_more', n=protect_info.guard_need) }}){% else
-                    %}✅{% endif %}
-                </span>
-                <span>{{ t('protect.adults') }}: <strong
-                        style="color: {% if protect_info.adult_need > 0 %}#ff6666{% else %}#00ff41{% endif %}">
-                        {{ protect_info.adult_current }}/{{ protect_info.adult_min }}</strong>
-                    {% if protect_info.adult_need > 0 %}({{ t('protect.need_more', n=protect_info.adult_need) }}){% else
-                    %}✅{% endif %}
+    <div class="w-full bg-surface-container-lowest border-2 border-accent p-3 flex flex-col md:flex-row items-center justify-between gap-4">
+        <div class="flex flex-col md:flex-row md:items-center gap-3">
+            <div class="flex items-center gap-2">
+                <span class="material-symbols-outlined text-accent animate-bounce" data-icon="shield">shield</span>
+                <span class="font-code-critical text-accent font-bold uppercase tracking-widest text-sm">
+                    {{ t('protect.title') }}
                 </span>
             </div>
+            <p class="font-label-kr text-xs text-on-surface-variant italic">
+                {{ t('protect.desc') }}
+            </p>
+        </div>
+        <div class="flex gap-4 font-code-critical text-xs text-on-surface-variant">
+            <span>{{ t('protect.guards') }}: 
+                <strong class="{% if protect_info.guard_need > 0 %}text-error{% else %}text-mint{% endif %}">
+                    {{ protect_info.guard_current }}/{{ protect_info.guard_min }}
+                </strong>
+                {% if protect_info.guard_need > 0 %}(+{{ protect_info.guard_need }}){% else %}✅{% endif %}
+            </span>
+            <span>{{ t('protect.adults') }}: 
+                <strong class="{% if protect_info.adult_need > 0 %}text-error{% else %}text-mint{% endif %}">
+                    {{ protect_info.adult_current }}/{{ protect_info.adult_min }}
+                </strong>
+                {% if protect_info.adult_need > 0 %}(+{{ protect_info.adult_need }}){% else %}✅{% endif %}
+            </span>
         </div>
     </div>
     {% endif %}
 
-    {# === 인사말 === #}
-    <div class="greeting-bar">
-        <span class="npc-speech">💬 "{{ greeting }}"</span>
+    <!-- NPC speech greeting -->
+    <div class="relative bg-surface/50 p-4 border-l-4 border-primary-container flex items-center gap-4 inner-glow-primary">
+        <div class="w-14 h-14 bg-surface border border-outline overflow-hidden flex-shrink-0">
+            <!-- Googlemind Pixel Grotesque Creature Asset -->
+            <img class="w-full h-full object-cover" alt="Jissou creature" src="https://lh3.googleusercontent.com/aida-public/AB6AXuARJRZg68Ul_4H1ACdk0BVn03QF-HbnCRybyb_s_XQD7_IL9BudGfqULei_bEx0ZCxg3Pru1a--TsgukvMQLyIH_J2mgjfvG7V6xOchP3u_x7AUkA3n-73kZC0fhiTVfZS5iWZ8SXidiaUF9nH53jO5V9QQxfXX9CBM0D6jKODENtFi5wERPQ6GaQQEvQVdEo-hplIkTXeqditAXVI9h5rU6mBIls9vo5GsGnze4DqV58Ml8d2N5MgxmeeBg7313G2rl_5_-HJpXs7-"/>
+        </div>
+        <div class="flex-1">
+            <div class="text-[10px] text-mint font-bold uppercase tracking-widest">[ SPEECH_MODULE_ACTIVE ]</div>
+            <p class="font-label-kr text-sm text-primary italic leading-relaxed">
+                "{{ greeting }}"
+            </p>
+        </div>
     </div>
 
-    {# === 3열 현황 패널 === #}
-    <div class="status-panels">
-        {# 공원 현황 #}
-        <div class="terminal-box panel">
-            <div class="box-header">{{ t('dash.park_status') }}</div>
-            <div class="box-content">
-                <div class="stat-line boss-line">{{ t('dash.boss') }}: 1
-                    <div class="hp-bar">
-                        <div class="hp-fill" style="width: {{ park.boss_hp }}%"></div>
-                        <span class="hp-text">{{ park.boss_hp }}/100</span>
+    <!-- 3-Column Status Panel -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-0 border-2 border-outline bg-surface overflow-hidden">
+        <!-- 01. POPULATION METRICS -->
+        <div class="p-panel-padding border-b-2 lg:border-b-0 lg:border-r-2 border-outline space-y-4">
+            <div class="bg-primary text-background px-2 py-1 font-bold text-xs uppercase tracking-wider flex items-center justify-between">
+                <span>01. POPULATION_METRICS</span>
+                <span class="material-symbols-outlined text-[14px]">groups</span>
+            </div>
+            <div class="space-y-3 font-code-critical text-xs">
+                <!-- Boss HP -->
+                <div class="space-y-1">
+                    <div class="flex justify-between text-[11px]">
+                        <span class="text-on-surface-variant font-bold">👑 BOSS HP</span>
+                        <strong class="{% if park.boss_hp < 30 %}text-error animate-pulse{% else %}text-mint{% endif %}">{{ park.boss_hp }}/100</strong>
+                    </div>
+                    <div class="h-2 bg-surface-container-lowest border border-outline relative overflow-hidden">
+                        <div class="h-full {% if park.boss_hp < 30 %}bg-error{% else %}bg-primary-container{% endif %}" style="width: {{ park.boss_hp }}%"></div>
                     </div>
                 </div>
-                <div class="stat-line">{{ t('dash.guards') }}: <strong>{{ park.guard_count }}</strong></div>
-                <div class="stat-line">{{ t('dash.adults') }}: <strong>{{ park.adult_count }}</strong></div>
-                <div class="stat-line">{{ t('dash.children') }}: <strong>{{ park.child_count }}</strong></div>
-                <div class="stat-line">{{ t('dash.babies') }}: <strong>{{ park.baby_count }}</strong>
-                    {% if park.baby_cap > 0 %}
-                    <span class="cap-info">/ {{ park.baby_cap }}</span>
+                <!-- Population Detail Grid -->
+                <div class="grid grid-cols-2 gap-x-4 gap-y-2 border-y border-outline-variant/30 py-3 text-[11px]">
+                    <div class="flex justify-between border-b border-outline-variant/30 pb-1">
+                        <span class="text-on-surface-variant">⚔️ {{ t('dash.guards') }}</span>
+                        <strong class="text-primary-container">{{ park.guard_count }}</strong>
+                    </div>
+                    <div class="flex justify-between border-b border-outline-variant/30 pb-1">
+                        <span class="text-on-surface-variant"> 성체 {{ t('dash.adults') }}</span>
+                        <strong class="text-primary-container">{{ park.adult_count }}</strong>
+                    </div>
+                    <div class="flex justify-between border-b border-outline-variant/30 pb-1">
+                        <span class="text-on-surface-variant"> 자실장 {{ t('dash.children') }}</span>
+                        <strong class="text-primary-container">{{ park.child_count }}</strong>
+                    </div>
+                    <div class="flex justify-between border-b border-outline-variant/30 pb-1">
+                        <span class="text-on-surface-variant"> 저실장 {{ t('dash.babies') }}</span>
+                        <strong class="text-primary-container">
+                            {{ park.baby_count }}{% if park.baby_cap > 0 %}<span class="text-[10px] text-text-dim">/{{ park.baby_cap }}</span>{% endif %}
+                        </strong>
+                    </div>
+                </div>
+                <!-- Morale -->
+                <div class="space-y-1">
+                    <div class="flex justify-between text-[11px]">
+                        <span class="text-on-surface-variant">❤️ {{ t('dash.morale') }}</span>
+                        <strong class="{% if park.morale < 30 %}text-error{% else %}text-primary-container{% endif %}">{{ park.morale }}/100</strong>
+                    </div>
+                    <div class="h-2 bg-surface-container-lowest border border-outline relative overflow-hidden">
+                        <div class="h-full {% if park.morale < 30 %}bg-error{% else %}bg-primary-container{% endif %}" style="width: {{ park.morale }}%"></div>
+                    </div>
+                </div>
+                <!-- Total Power & Pop Bar -->
+                <div class="space-y-1 pt-2">
+                    <div class="flex justify-between text-[11px]">
+                        <span class="text-on-surface-variant">📦 {{ t('dash.population') }}</span>
+                        <strong>{{ park.total_population }} / {{ park.population_cap }}</strong>
+                    </div>
+                    <div class="h-1.5 bg-surface-container-lowest border border-outline overflow-hidden">
+                        <div class="h-full bg-outline-variant" style="width: {{ [park.total_population / park.population_cap * 100, 100] | min }}%"></div>
+                    </div>
+                </div>
+                <div class="flex justify-between items-center bg-surface-container-lowest border border-outline p-2 mt-2">
+                    <span class="text-on-surface-variant text-[11px]">⚔️ {{ t('dash.power') }}</span>
+                    <strong class="text-sm text-primary-container glow-sm">{{ park.total_combat_power }}</strong>
+                </div>
+            </div>
+        </div>
+
+        <!-- 02. RESOURCE INVENTORY -->
+        <div class="p-panel-padding border-b-2 lg:border-b-0 lg:border-r-2 border-outline space-y-4">
+            <div class="bg-primary text-background px-2 py-1 font-bold text-xs uppercase tracking-wider flex items-center justify-between">
+                <span>02. RESOURCE_INVENTORY</span>
+                <span class="material-symbols-outlined text-[14px]">inventory_2</span>
+            </div>
+            <div class="space-y-2.5 font-code-critical text-xs">
+                <!-- Konpeito -->
+                <div class="flex justify-between items-center p-2 bg-surface-container-lowest border border-outline">
+                    <span class="flex items-center gap-1 font-bold text-accent">
+                        🍬 {{ t('dash.konpeito') }}
+                    </span>
+                    <strong class="text-primary-container">
+                        {{ park.konpeito }}<span class="text-[10px] text-text-dim">/{{ park.konpeito_cap }}</span>
+                        <span class="ml-1 text-[9px] bg-accent/20 text-accent border border-accent/40 px-1 font-normal">×10NP</span>
+                    </strong>
+                </div>
+                <!-- Trash -->
+                <div class="flex justify-between items-center p-2 bg-surface-container-lowest border border-outline">
+                    <span class="flex items-center gap-1 text-[#baccb1]">
+                        🗑️ {{ t('dash.trash') }}
+                    </span>
+                    <strong class="text-on-surface-variant">
+                        {{ park.trash_food }}<span class="text-[10px] text-text-dim">/{{ park.trash_food_cap }}</span>
+                        <span class="ml-1 text-[9px] bg-outline-variant/30 text-outline px-1 font-normal">×1NP</span>
+                    </strong>
+                </div>
+                <!-- Meat -->
+                <div class="flex justify-between items-center p-2 bg-surface-container-lowest border border-outline">
+                    <span class="flex items-center gap-1 text-error">
+                        🍖 {{ t('dash.meat') }}
+                    </span>
+                    <strong class="text-error">
+                        {{ park.meat_stock }}
+                        <span class="ml-1 text-[9px] bg-error/20 text-error border border-error/40 px-1 font-normal">×5NP</span>
+                    </strong>
+                </div>
+                <!-- Material -->
+                <div class="flex justify-between items-center p-2 bg-surface-container-lowest border border-outline">
+                    <span class="flex items-center gap-1 text-[#ffcf90]">
+                        🧱 {{ t('dash.material') }}
+                    </span>
+                    <strong class="text-on-surface-variant">
+                        {{ park.material }}<span class="text-[10px] text-text-dim">/{{ park.material_cap }}</span>
+                    </strong>
+                </div>
+                <!-- NP Summary -->
+                <div class="border-t border-dashed border-outline-variant/40 pt-2.5 mt-2 space-y-1.5 text-[11px]">
+                    <div class="flex justify-between">
+                        <span class="text-on-surface-variant">{{ t('dash.total_np') }}</span>
+                        <strong class="text-accent">{{ park.total_np_available }} NP</strong>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-on-surface-variant">{{ t('dash.np_per_turn') }}</span>
+                        <strong class="text-error">-{{ park.total_np_per_turn | round(1) }} NP</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 03. INFRASTRUCTURE -->
+        <div class="p-panel-padding space-y-4">
+            <div class="bg-primary text-background px-2 py-1 font-bold text-xs uppercase tracking-wider flex items-center justify-between">
+                <span>03. INFRASTRUCTURE</span>
+                <span class="material-symbols-outlined text-[14px]">corporate_fare</span>
+            </div>
+            <div class="space-y-2 font-code-critical text-[11px]">
+                <div class="flex justify-between border-b border-outline-variant/20 pb-1">
+                    <span class="text-on-surface-variant">📦 {{ t('dash.houses') }}</span>
+                    <strong>{{ park.cardboard_houses }}</strong>
+                </div>
+                <div class="flex justify-between border-b border-outline-variant/20 pb-1">
+                    <span class="text-on-surface-variant">🕳️ {{ t('dash.burrows') }}</span>
+                    <strong>{{ park.unchi_holes }}</strong>
+                </div>
+                <div class="flex justify-between border-b border-outline-variant/20 pb-1">
+                    <span class="text-on-surface-variant">📦 {{ t('dash.storage') }}</span>
+                    <strong>{{ park.storage_holes }}</strong>
+                </div>
+                <div class="flex justify-between border-b border-outline-variant/20 pb-1">
+                    <span class="text-on-surface-variant">🛡️ {{ t('dash.walls') }}</span>
+                    <strong>{{ park.walls }}</strong>
+                </div>
+                <div class="flex justify-between border-b border-outline-variant/20 pb-1">
+                    <span class="text-on-surface-variant">🗼 {{ t('dash.watchtower') }}</span>
+                    <strong>{{ park.watchtowers }}</strong>
+                </div>
+                <!-- Queues -->
+                {% if building_queue or training_queue %}
+                <div class="mt-3 p-2 bg-surface-container-lowest border border-primary-container text-primary-container animate-pulse space-y-1.5">
+                    {% if building_queue %}
+                    <div class="font-bold text-[10px] text-mint uppercase tracking-widest">{{ t('dash.building_queue') }}:</div>
+                    {% for b in building_queue %}
+                    <div class="flex justify-between text-[10px]">
+                        <span>{{ buildings[b.building_type].emoji }} {{ buildings[b.building_type].name }}</span>
+                        <strong>{{ t('dash.turns_left', n=b.turns_remaining) }}</strong>
+                    </div>
+                    {% endfor %}
+                    {% endif %}
+                    
+                    {% if training_queue %}
+                    <div class="font-bold text-[10px] text-mint uppercase tracking-widest mt-1">{{ t('dash.training_queue') }}:</div>
+                    {% for tr in training_queue %}
+                    <div class="flex justify-between text-[10px]">
+                        <span>💂 {{ t('dash.guard_training') }}</span>
+                        <strong>{{ t('dash.turns_left', n=tr.turns_remaining) }}</strong>
+                    </div>
+                    {% endfor %}
                     {% endif %}
                 </div>
-                <div class="stat-divider"></div>
-                <div class="stat-line pop-line">
-                    {{ t('dash.population') }}: {{ park.total_population }}/{{ park.population_cap }}
-                    <div class="pop-bar">
-                        <div class="pop-fill"
-                            style="width: {{ [park.total_population / park.population_cap * 100, 100] | min }}%"></div>
-                    </div>
-                </div>
-                <div class="stat-line">{{ t('dash.power') }}: <strong>{{ park.total_combat_power }}</strong></div>
-                <div class="stat-line morale-line">
-                    {{ t('dash.morale') }}: {{ park.morale }}/100
-                    <div class="morale-bar">
-                        <div class="morale-fill {% if park.morale < 30 %}low{% elif park.morale > 70 %}high{% endif %}"
-                            style="width: {{ park.morale }}%"></div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        {# 자원 현황 #}
-        <div class="terminal-box panel">
-            <div class="box-header">{{ t('dash.resources') }}</div>
-            <div class="box-content">
-                <div class="stat-line konpeito-line">{{ t('dash.konpeito') }}: <strong>{{ park.konpeito }}</strong><span
-                        class="cap-info">/{{ park.konpeito_cap }}</span>
-                    <span class="np-badge">×10NP</span>
-                </div>
-                <div class="stat-line trash-line">{{ t('dash.trash') }}: <strong>{{ park.trash_food }}</strong><span
-                        class="cap-info">/{{ park.trash_food_cap }}</span>
-                    <span class="np-badge dim">×1NP</span>
-                </div>
-                <div class="stat-line meat-line">{{ t('dash.meat') }}: <strong>{{ park.meat_stock }}</strong>
-                    <span class="np-badge">×5NP</span>
-                </div>
-                <div class="stat-divider"></div>
-                <div class="stat-line">{{ t('dash.material') }}: <strong>{{ park.material }}</strong><span
-                        class="cap-info">{{
-                        park.material_cap }}</span></div>
-                <div class="stat-divider"></div>
-                <div class="stat-line np-total">
-                    {{ t('dash.total_np') }}: <strong class="np-value">{{ park.total_np_available }}</strong>
-                </div>
-                <div class="stat-line np-consume">
-                    {{ t('dash.np_per_turn') }}: <strong class="np-cost">{{ park.total_np_per_turn | round(1) }}
-                        NP</strong>
-                </div>
-            </div>
-        </div>
-
-        {# 시설 현황 #}
-        <div class="terminal-box panel">
-            <div class="box-header">{{ t('dash.facilities') }}</div>
-            <div class="box-content">
-                <div class="stat-line">{{ t('dash.houses') }}: <strong>{{ park.cardboard_houses }}</strong></div>
-                <div class="stat-line">{{ t('dash.burrows') }}: <strong>{{ park.unchi_holes }}</strong></div>
-                <div class="stat-line">{{ t('dash.storage') }}: <strong>{{ park.storage_holes }}</strong></div>
-                <div class="stat-line">{{ t('dash.walls') }}: <strong>{{ park.walls }}</strong></div>
-                <div class="stat-line">{{ t('dash.watchtower') }}: <strong>{{ park.watchtowers }}</strong></div>
-                {% if building_queue %}
-                <div class="stat-divider"></div>
-                <div class="queue-title">{{ t('dash.building_queue') }}:</div>
-                {% for b in building_queue %}
-                <div class="queue-item">
-                    {{ buildings[b.building_type].emoji }} {{ buildings[b.building_type].name }}
-                    ({{ t('dash.turns_left', n=b.turns_remaining) }})
-                </div>
-                {% endfor %}
-                {% endif %}
-                {% if training_queue %}
-                <div class="stat-divider"></div>
-                <div class="queue-title">{{ t('dash.training_queue') }}:</div>
-                {% for tr in training_queue %}
-                <div class="queue-item">{{ t('dash.guard_training') }} ({{ t('dash.turns_left', n=tr.turns_remaining)
-                    }})</div>
-                {% endfor %}
                 {% endif %}
             </div>
         </div>
     </div>
 
-    {# === 행동 메뉴 === #}
-    <div class="terminal-box action-box">
-        <div class="box-header">{{ t('action.title') }} ({{ t('action.ap_remaining') }}: {{ park.action_points }}/3)
+    <!-- Action Menu Grid -->
+    <div class="space-y-2">
+        <div class="text-xs font-bold text-mint font-code-critical flex items-center gap-1">
+            <span class="material-symbols-outlined text-sm">settings_input_component</span>
+            {{ t('action.title') }} ({{ t('action.ap_remaining') }}: {{ park.action_points }}/3)
         </div>
-        <div class="box-content action-grid">
-            {# 채집 #}
-            <div class="action-card" id="action-gather">
-                <div class="action-title">{{ t('action.gather') }} <span class="ap-cost">1AP</span></div>
-                <form method="POST" action="{{ url_for('game.gather') }}" class="action-form">
-                    <div class="action-inputs">
-                        <label>{{ t('dash.adults') }}: <input type="number" name="num_adults"
-                                value="{{ park.gathering_adults if park.gathering_adults > 0 else (1 if park.adult_count > 0 else 0) }}"
-                                min="0" max="{{ park.adult_count }}" class="num-input" id="gather-adults"></label>
-                        <label>{{ t('dash.children') }}: <input type="number" name="num_children"
-                                value="{{ park.gathering_children }}" min="0" max="{{ park.child_count }}"
-                                class="num-input" id="gather-children"></label>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            <!-- Gather Action Card -->
+            <div class="bg-surface border-2 border-outline p-4 flex flex-col justify-between" id="action-gather">
+                <div>
+                    <div class="flex justify-between items-center mb-3">
+                        <h4 class="text-xs font-bold text-primary flex items-center gap-1.5 uppercase font-code-critical">
+                            <span class="material-symbols-outlined text-sm">front_hand</span>
+                            {{ t('action.gather') }}
+                        </h4>
+                        <span class="text-[10px] font-code-critical text-primary bg-primary/20 px-2 py-0.5 border border-primary/40">1 AP</span>
                     </div>
-                    <button type="submit" class="terminal-btn btn-action" id="btn-gather" {% if park.action_points < 1
-                        and park.turn_quota < 1 %}disabled{% endif %}>
-                        {{ t('action.gather_go') }}
-                    </button>
-                </form>
+                    <form method="POST" action="{{ url_for('game.gather') }}" class="space-y-3">
+                        <div class="grid grid-cols-2 gap-2 text-xs font-code-critical">
+                            <label class="flex flex-col gap-1">
+                                <span class="text-on-surface-variant">성체 {{ t('dash.adults') }}</span>
+                                <input type="number" name="num_adults"
+                                    value="{{ park.gathering_adults if park.gathering_adults > 0 else (1 if park.adult_count > 0 else 0) }}"
+                                    min="0" max="{{ park.adult_count }}" class="bg-surface-container-lowest border border-outline px-2 py-1 w-full" id="gather-adults">
+                            </label>
+                            <label class="flex flex-col gap-1">
+                                <span class="text-on-surface-variant">자실장 {{ t('dash.children') }}</span>
+                                <input type="number" name="num_children"
+                                    value="{{ park.gathering_children }}" min="0" max="{{ park.child_count }}"
+                                    class="bg-surface-container-lowest border border-outline px-2 py-1 w-full" id="gather-children">
+                            </label>
+                        </div>
+                        <button type="submit" class="w-full py-2 bg-primary-container text-background font-bold text-xs uppercase hover:brightness-125 transition-all active:scale-95 text-center block" id="btn-gather" {% if park.action_points < 1 and park.turn_quota < 1 %}disabled{% endif %}>
+                            {{ t('action.gather_go') }}
+                        </button>
+                    </form>
+                </div>
             </div>
 
-            {# 출산 #}
-            <div class="action-card" id="action-birth">
-                <div class="action-title">{{ t('action.breed') }} <span class="ap-cost">2AP</span></div>
-                <p class="action-desc">{{ t('action.breed_desc') }}</p>
+            <!-- Birth Action Card -->
+            <div class="bg-surface border-2 border-outline p-4 flex flex-col justify-between" id="action-birth">
+                <div>
+                    <div class="flex justify-between items-center mb-3">
+                        <h4 class="text-xs font-bold text-primary flex items-center gap-1.5 uppercase font-code-critical">
+                            <span class="material-symbols-outlined text-sm">child_care</span>
+                            {{ t('action.breed') }}
+                        </h4>
+                        <span class="text-[10px] font-code-critical text-primary bg-primary/20 px-2 py-0.5 border border-primary/40">2 AP</span>
+                    </div>
+                    <p class="font-label-kr text-xs text-on-surface-variant mb-4 min-h-[36px]">
+                        {{ t('action.breed_desc') }}
+                    </p>
+                </div>
                 <form method="POST" action="{{ url_for('game.birth') }}">
-                    <button type="submit" class="terminal-btn btn-action" id="btn-birth" {% if (park.action_points < 2
-                        and park.turn_quota < 1) or park.adult_count < 1 %}disabled{% endif %}>
+                    <button type="submit" class="w-full py-2 bg-primary-container text-background font-bold text-xs uppercase hover:brightness-125 transition-all active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed text-center block" id="btn-birth" {% if (park.action_points < 2 and park.turn_quota < 1) or park.adult_count < 1 %}disabled{% endif %}>
                         {{ t('action.breed_go') }}
                     </button>
                 </form>
             </div>
 
-            {# 건설 #}
-            <div class="action-card" id="action-build">
-                <div class="action-title">{{ t('action.build') }} <span class="ap-cost">1AP</span> <span
-                        class="cap-info">({{ t('dash.material') }}: {{
-                        park.material }})</span></div>
-                <form method="POST" action="{{ url_for('game.build') }}" class="action-form">
-                    <select name="building_type" class="terminal-select" id="build-select">
-                        {% for key, bldg in buildings.items() %}
-                        <option value="{{ key }}">
-                            {{ bldg.emoji }} {{ bldg.name }} — 🧱{{ bldg.material_cost }} / {{ bldg.turns }}{{
-                            t('dash.turn') }} {% if
-                            park.material < bldg.material_cost %}[{{ t('action.build_insufficient') }}]{% else %}✅{%
-                                endif %} </option>
-                                {% endfor %}
-                    </select>
-                    <p class="action-desc" id="build-desc">{{ t('action.build_desc') }}</p>
-                    <button type="submit" class="terminal-btn btn-action" id="btn-build" {% if park.action_points < 1
-                        and park.turn_quota < 1 %}disabled{% endif %}>
-                        {{ t('action.build_go') }}
-                    </button>
-                </form>
+            <!-- Build Action Card -->
+            <div class="bg-surface border-2 border-outline p-4 flex flex-col justify-between" id="action-build">
+                <div>
+                    <div class="flex justify-between items-center mb-3">
+                        <h4 class="text-xs font-bold text-primary flex items-center gap-1.5 uppercase font-code-critical">
+                            <span class="material-symbols-outlined text-sm">construction</span>
+                            {{ t('action.build') }}
+                        </h4>
+                        <span class="text-[10px] font-code-critical text-primary bg-primary/20 px-2 py-0.5 border border-primary/40">1 AP</span>
+                    </div>
+                    <form method="POST" action="{{ url_for('game.build') }}" class="space-y-3">
+                        <select name="building_type" class="bg-surface-container-lowest text-primary border border-outline px-2 py-1 text-xs w-full font-code-critical focus:ring-0" id="build-select">
+                            {% for key, bldg in buildings.items() %}
+                            <option value="{{ key }}">
+                                {{ bldg.emoji }} {{ bldg.name }} — 🧱{{ bldg.material_cost }} / {{ bldg.turns }}T {% if park.material < bldg.material_cost %}[{{ t('action.build_insufficient') }}]{% else %}✅{% endif %}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <p class="font-label-kr text-[11px] text-on-surface-variant italic min-h-[30px]" id="build-desc">
+                            {{ t('action.build_desc') }}
+                        </p>
+                        <button type="submit" class="w-full py-2 bg-primary-container text-background font-bold text-xs uppercase hover:brightness-125 transition-all active:scale-95 text-center block" id="btn-build" {% if park.action_points < 1 and park.turn_quota < 1 %}disabled{% endif %}>
+                            {{ t('action.build_go') }}
+                        </button>
+                    </form>
+                </div>
             </div>
 
-            {# 훈련 #}
-            <div class="action-card" id="action-train">
-                <div class="action-title">{{ t('action.train') }} <span class="ap-cost">1AP</span></div>
-                <p class="action-desc">{{ t('action.train_desc') }}</p>
+            <!-- Train Action Card -->
+            <div class="bg-surface border-2 border-outline p-4 flex flex-col justify-between" id="action-train">
+                <div>
+                    <div class="flex justify-between items-center mb-3">
+                        <h4 class="text-xs font-bold text-primary flex items-center gap-1.5 uppercase font-code-critical">
+                            <span class="material-symbols-outlined text-sm">military_tech</span>
+                            {{ t('action.train') }}
+                        </h4>
+                        <span class="text-[10px] font-code-critical text-primary bg-primary/20 px-2 py-0.5 border border-primary/40">1 AP</span>
+                    </div>
+                    <p class="font-label-kr text-xs text-on-surface-variant mb-4 min-h-[36px]">
+                        {{ t('action.train_desc') }}
+                    </p>
+                </div>
                 <form method="POST" action="{{ url_for('game.train') }}">
-                    <button type="submit" class="terminal-btn btn-action" id="btn-train" {% if (park.action_points < 1
-                        and park.turn_quota < 1) or park.adult_count < 1 %}disabled{% endif %}>
+                    <button type="submit" class="w-full py-2 bg-primary-container text-background font-bold text-xs uppercase hover:brightness-125 transition-all active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed text-center block" id="btn-train" {% if (park.action_points < 1 and park.turn_quota < 1) or park.adult_count < 1 %}disabled{% endif %}>
                         {{ t('action.train_go') }}
                     </button>
                 </form>
             </div>
 
-            {# 솎아내기 - 저실장 #}
-            <div class="action-card cull-card" id="action-cull-baby">
-                <div class="action-title">{{ t('action.cull_baby') }} <span class="ap-cost free">0AP</span></div>
-                <form method="POST" action="{{ url_for('game.cull') }}" class="action-form">
-                    <input type="hidden" name="target_type" value="baby">
-                    <div class="action-inputs">
-                        <label>{{ t('action.cull_count') }}: <input type="number" name="count" value="1" min="1"
-                                max="{{ park.baby_count }}" class="num-input"></label>
-                        <select name="convert_to" class="terminal-select">
-                            <option value="food">{{ t('action.cull_to_food') }} (5NP)</option>
-                            <option value="material">{{ t('action.cull_to_mat') }} (3)</option>
-                        </select>
+            <!-- Cull Baby Action Card (Crimson Alert) -->
+            <div class="bg-surface border-2 border-error/50 p-4 flex flex-col justify-between" id="action-cull-baby">
+                <div>
+                    <div class="flex justify-between items-center mb-3">
+                        <h4 class="text-xs font-bold text-error flex items-center gap-1.5 uppercase font-code-critical animate-pulse">
+                            <span class="material-symbols-outlined text-sm animate-spin">content_cut</span>
+                            {{ t('action.cull_baby') }}
+                        </h4>
+                        <span class="text-[10px] font-code-critical text-error bg-error/20 px-2 py-0.5 border border-error/40 font-bold">0 AP</span>
                     </div>
-                    <button type="submit" class="terminal-btn btn-cull" id="btn-cull-baby" {% if park.baby_count < 1
-                        %}disabled{% endif %}>
-                        {{ t('action.cull_go') }}
-                    </button>
-                </form>
+                    <form method="POST" action="{{ url_for('game.cull') }}" class="space-y-3">
+                        <input type="hidden" name="target_type" value="baby">
+                        <div class="grid grid-cols-2 gap-2 text-xs font-code-critical">
+                            <label class="flex flex-col gap-1">
+                                <span class="text-on-surface-variant">{{ t('action.cull_count') }}</span>
+                                <input type="number" name="count" value="1" min="1" max="{{ park.baby_count }}" class="bg-surface-container-lowest border border-outline px-2 py-1 w-full">
+                            </label>
+                            <label class="flex flex-col gap-1">
+                                <span class="text-on-surface-variant">결과</span>
+                                <select name="convert_to" class="bg-surface-container-lowest text-primary border border-outline px-1.5 py-1 w-full text-[11px] focus:ring-0">
+                                    <option value="food">{{ t('action.cull_to_food') }} (5NP)</option>
+                                    <option value="material">{{ t('action.cull_to_mat') }} (3)</option>
+                                </select>
+                            </label>
+                        </div>
+                        <button type="submit" class="w-full py-2 bg-error text-white font-bold text-xs uppercase hover:brightness-125 transition-all active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed text-center block" id="btn-cull-baby" {% if park.baby_count < 1 %}disabled{% endif %}>
+                            {{ t('action.cull_go') }}
+                        </button>
+                    </form>
+                </div>
             </div>
 
-            {# 솎아내기 - 자실장 #}
-            <div class="action-card cull-card" id="action-cull-child">
-                <div class="action-title">{{ t('action.cull_child') }} <span class="ap-cost free">0AP</span></div>
-                <form method="POST" action="{{ url_for('game.cull') }}" class="action-form">
-                    <input type="hidden" name="target_type" value="child">
-                    <div class="action-inputs">
-                        <label>{{ t('action.cull_count') }}: <input type="number" name="count" value="1" min="1"
-                                max="{{ park.child_count }}" class="num-input"></label>
-                        <select name="convert_to" class="terminal-select">
-                            <option value="food">{{ t('action.cull_to_food') }} (10NP)</option>
-                            <option value="material">{{ t('action.cull_to_mat') }} (5)</option>
-                        </select>
+            <!-- Cull Child Action Card (Crimson Alert) -->
+            <div class="bg-surface border-2 border-error/50 p-4 flex flex-col justify-between" id="action-cull-child">
+                <div>
+                    <div class="flex justify-between items-center mb-3">
+                        <h4 class="text-xs font-bold text-error flex items-center gap-1.5 uppercase font-code-critical animate-pulse">
+                            <span class="material-symbols-outlined text-sm">delete_forever</span>
+                            {{ t('action.cull_child') }}
+                        </h4>
+                        <span class="text-[10px] font-code-critical text-error bg-error/20 px-2 py-0.5 border border-error/40 font-bold font-bold">0 AP</span>
                     </div>
-                    <button type="submit" class="terminal-btn btn-cull" id="btn-cull-child" {% if park.child_count < 1
-                        %}disabled{% endif %}>
-                        {{ t('action.cull_go') }}
-                    </button>
-                </form>
+                    <form method="POST" action="{{ url_for('game.cull') }}" class="space-y-3">
+                        <input type="hidden" name="target_type" value="child">
+                        <div class="grid grid-cols-2 gap-2 text-xs font-code-critical">
+                            <label class="flex flex-col gap-1">
+                                <span class="text-on-surface-variant">{{ t('action.cull_count') }}</span>
+                                <input type="number" name="count" value="1" min="1" max="{{ park.child_count }}" class="bg-surface-container-lowest border border-outline px-2 py-1 w-full">
+                            </label>
+                            <label class="flex flex-col gap-1">
+                                <span class="text-on-surface-variant">결과</span>
+                                <select name="convert_to" class="bg-surface-container-lowest text-primary border border-outline px-1.5 py-1 w-full text-[11px] focus:ring-0">
+                                    <option value="food">{{ t('action.cull_to_food') }} (10NP)</option>
+                                    <option value="material">{{ t('action.cull_to_mat') }} (5)</option>
+                                </select>
+                            </label>
+                        </div>
+                        <button type="submit" class="w-full py-2 bg-error text-white font-bold text-xs uppercase hover:brightness-125 transition-all active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed text-center block" id="btn-cull-child" {% if park.child_count < 1 %}disabled{% endif %}>
+                            {{ t('action.cull_go') }}
+                        </button>
+                    </form>
+                </div>
             </div>
         </div>
     </div>
-    {# === 전투/방어 액션 === #}
-    <div class="terminal-box action-box">
-        <div class="box-header">{{ t('battle.title') }} (AP: {{ park.action_points }}/3)</div>
-        <div class="box-content action-grid">
-            {# 방어 배치 #}
-            <div class="action-card" id="action-defend">
-                <div class="action-title">{{ t('action.defend') }} <span class="ap-cost">1AP</span></div>
-                <form method="POST" action="{{ url_for('game.defend') }}" class="action-form">
-                    <div class="action-inputs">
-                        <label>{{ t('dash.guards') }}: <input type="number" name="num_guards"
+
+    <!-- Battle/Defense Panel & Secondary Actions -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <!-- Defense configuration -->
+        <div class="bg-surface border-2 border-outline p-panel-padding space-y-3 flex flex-col justify-between">
+            <div>
+                <div class="bg-primary text-background px-2 py-1 font-bold text-xs uppercase tracking-wider flex items-center justify-between mb-3">
+                    <span>🛡️ DEFENSE PROTOCOL</span>
+                    <span class="material-symbols-outlined text-[14px]">local_police</span>
+                </div>
+                <form method="POST" action="{{ url_for('game.defend') }}" class="space-y-3 font-code-critical text-xs">
+                    <div class="grid grid-cols-2 gap-4">
+                        <label class="flex flex-col gap-1">
+                            <span class="text-on-surface-variant">🛡️💂 {{ t('dash.guards') }} 배치</span>
+                            <input type="number" name="num_guards"
                                 value="{{ park.defending_guards }}" min="0" max="{{ park.guard_count }}"
-                                class="num-input"></label>
-                        <label>{{ t('dash.adults') }}: <input type="number" name="num_adults"
+                                class="bg-surface-container-lowest border border-outline px-2 py-1 w-full">
+                        </label>
+                        <label class="flex flex-col gap-1">
+                            <span class="text-on-surface-variant">🛡️성체 {{ t('dash.adults') }} 배치</span>
+                            <input type="number" name="num_adults"
                                 value="{{ park.defending_adults }}" min="0" max="{{ park.adult_count }}"
-                                class="num-input"></label>
+                                class="bg-surface-container-lowest border border-outline px-2 py-1 w-full">
+                        </label>
                     </div>
-                    <p class="action-desc">{{ t('action.defend_power') }}: <strong>{{ park.defense_power }}</strong></p>
-                    <button type="submit" class="terminal-btn btn-action" id="btn-defend" {% if park.action_points < 1
-                        and park.turn_quota < 1 %}disabled{% endif %}>
+                    <div class="flex justify-between items-center p-2 bg-surface-container-lowest border border-outline">
+                        <span class="text-on-surface-variant">{{ t('action.defend_power') }}:</span>
+                        <strong class="text-mint text-sm">{{ park.defense_power }}</strong>
+                    </div>
+                    <button type="submit" class="w-full py-2 bg-primary-container text-background font-bold text-xs uppercase hover:brightness-125 transition-all active:scale-95 text-center block" id="btn-defend" {% if park.action_points < 1 and park.turn_quota < 1 %}disabled{% endif %}>
                         {{ t('action.defend_change') }}
                     </button>
                 </form>
             </div>
+        </div>
 
-            {# 디버그 턴 진행 #}
-            <div class="action-card" id="action-debug-turn">
-                <div class="action-title">{{ t('battle.debug_turn') }} <span class="ap-cost free">DEBUG</span></div>
-                <p class="action-desc">{{ t('battle.debug_desc') }}</p>
-                <form method="POST" action="{{ url_for('game.debug_next_turn') }}">
-                    <button type="submit" class="terminal-btn btn-action" id="btn-debug-turn">
-                        {{ t('battle.debug_go') }}
-                    </button>
-                </form>
-            </div>
-
-            {# 전투 기록 #}
-            <div class="action-card" id="action-battle-log">
-                <div class="action-title">{{ t('battle.logs_title') }}</div>
-                <p class="action-desc">{{ t('battle.logs_desc') }}</p>
-                <a href="{{ url_for('game.battle_logs') }}" class="terminal-btn btn-action" id="btn-battle-logs">
-                    {{ t('battle.logs_go') }}
-                </a>
+        <!-- Event Log Console -->
+        <div class="bg-surface border-2 border-outline p-panel-padding h-64 flex flex-col justify-between">
+            <div>
+                <div class="bg-primary text-background px-2 py-1 font-bold text-xs uppercase tracking-wider flex items-center justify-between mb-2">
+                    <span>💬 EMPIRE EVENT LOG (V1.04)</span>
+                    <span class="w-2 h-2 bg-primary-container rounded-full animate-ping"></span>
+                </div>
+                <div class="overflow-y-auto max-h-44 font-code-critical text-[11px] space-y-1.5 text-on-surface-variant pr-1">
+                    {% if recent_logs %}
+                    {% for log in recent_logs %}
+                    <div class="{% if log.event_type == 'danger' or log.event_type == 'rebellion' or log.event_type == 'disease' %}text-error{% elif log.event_type == 'gather' or log.event_type == 'birth' or log.event_type == 'build' %}text-primary-container{% endif %} leading-relaxed">
+                        <span class="text-text-dim">[{{ t('event.turn', turn=log.turn_number) }}]</span> {{ log.message }}
+                    </div>
+                    {% endfor %}
+                    {% else %}
+                    <div class="text-[#85967d]">{{ t('dash.new_park_log') }}</div>
+                    {% endif %}
+                </div>
             </div>
         </div>
     </div>
 
-    {# === 이벤트 로그 === #}
-    <div class="terminal-box log-box">
-        <div class="box-header">{{ t('event.title') }}</div>
-        <div class="box-content log-content">
-            {% if recent_logs %}
-            {% for log in recent_logs %}
-            <div class="log-entry log-{{ log.event_type }}">
-                <span class="log-turn">[{{ t('event.turn', turn=log.turn_number) }}]</span>
-                <span class="log-msg">{{ log.message }}</span>
-            </div>
-            {% endfor %}
-            {% else %}
-            <div class="log-entry">{{ t('dash.new_park_log') }}</div>
-            {% endif %}
+    <!-- Other Parks List (Scout & Invasion) -->
+    <div class="bg-surface border-2 border-outline p-panel-padding space-y-3">
+        <div class="bg-primary text-background px-2 py-1 font-bold text-xs uppercase tracking-wider flex items-center justify-between">
+            <span>📡 NEIGHBORING TERRITORIES (RECONNAISSANCE)</span>
+            <span class="material-symbols-outlined text-[14px]">satellite_alt</span>
         </div>
-    </div>
-
-    {# === 다른 공원 목록 (정찰 + 침공) === #}
-    <div class="terminal-box parks-box">
-        <div class="box-header">{{ t('parks.title') }}</div>
-        <div class="box-content">
-            <table class="park-table">
+        <div class="overflow-x-auto w-full">
+            <table class="w-full text-left font-code-critical text-[11px] whitespace-nowrap">
                 <thead>
-                    <tr>
-                        <th>{{ t('parks.name') }}</th>
-                        <th>{{ t('parks.boss') }}</th>
-                        <th>{{ t('parks.power') }}</th>
-                        <th>{{ t('parks.personality') }}</th>
-                        <th>{{ t('parks.actions') }}</th>
+                    <tr class="border-b-2 border-outline text-text-dim text-[10px]">
+                        <th class="py-2.5 px-3">PARK NAME</th>
+                        <th class="py-2.5 px-3">TYPE</th>
+                        <th class="py-2.5 px-3">POWER (PREVIEW)</th>
+                        <th class="py-2.5 px-3">PERSONALITY</th>
+                        <th class="py-2.5 px-3 text-right">ACTIONS</th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody class="divide-y divide-outline/30">
                     {% for p in other_parks %}
-                    <tr class="{% if p.is_npc %}npc-row{% endif %}">
-                        <td>{{ p.name }}</td>
-                        <td>{% if p.is_npc %}NPC{% else %}{{ p.owner.username if p.owner else '???' }}{% endif %}</td>
-                        <td>{% if park.watchtowers > 0 %}{{ p.total_combat_power }}{% else %}???{% endif %}</td>
-                        <td>
+                    <tr class="hover:bg-surface-container-lowest/50 transition-colors">
+                        <td class="py-3 px-3 font-bold text-primary">{{ p.name }}</td>
+                        <td class="py-3 px-3">
                             {% if p.is_npc %}
-                            {% if p.npc_personality == 'aggressive' %}{{ t('parks.aggressive') }}
-                            {% elif p.npc_personality == 'defensive' %}{{ t('parks.defensive') }}
-                            {% elif p.npc_personality == 'peaceful' %}{{ t('parks.peaceful') }}
-                            {% elif p.npc_personality == 'cunning' %}{{ t('parks.cunning') }}
-                            {% elif p.npc_personality == 'berserk' %}{{ t('parks.berserk') }}
+                            <span class="bg-outline-variant/30 text-outline border border-outline-variant/50 px-1.5 py-0.5">NPC</span>
+                            {% else %}
+                            <span class="bg-accent/20 text-accent border border-accent/40 px-1.5 py-0.5">{{ p.owner.username if p.owner else 'USER' }}</span>
                             {% endif %}
-                            {% else %}{{ t('parks.player') }}{% endif %}
                         </td>
-                        <td>
-                            <button type="button" class="terminal-btn btn-attack-sm btn-scout" data-park-id="{{ p.id }}"
-                                data-park-name="{{ p.name }}">
+                        <td class="py-3 px-3">
+                            {% if park.watchtowers > 0 %}
+                            <strong class="text-primary-container">{{ p.total_combat_power }}</strong>
+                            {% else %}
+                            <span class="text-text-dim">???</span>
+                            {% endif %}
+                        </td>
+                        <td class="py-3 px-3">
+                            {% if p.is_npc %}
+                                {% if p.npc_personality == 'aggressive' %}<span class="text-error font-bold">☠️ {{ t('parks.aggressive') }}</span>
+                                {% elif p.npc_personality == 'defensive' %}<span class="text-mint font-bold">🛡️ {{ t('parks.defensive') }}</span>
+                                {% elif p.npc_personality == 'peaceful' %}<span class="text-primary-container">🕊️ {{ t('parks.peaceful') }}</span>
+                                {% elif p.npc_personality == 'cunning' %}<span class="text-accent font-bold">🃏 {{ t('parks.cunning') }}</span>
+                                {% elif p.npc_personality == 'berserk' %}<span class="text-error font-bold animate-pulse">🔥 {{ t('parks.berserk') }}</span>
+                                {% endif %}
+                            {% else %}
+                                <span class="text-accent">👑 {{ t('parks.player') }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="py-3 px-3 text-right space-x-2">
+                            <button type="button" class="bg-outline-variant text-[#eeffe4] font-bold text-[10px] px-3 py-1.5 hover:bg-primary hover:text-background transition-all btn-scout active:scale-95" data-park-id="{{ p.id }}" data-park-name="{{ p.name }}">
                                 {{ t('action.scout') }}
                             </button>
-                            <button type="button" class="terminal-btn btn-cull btn-attack-sm btn-open-attack"
-                                data-target-id="{{ p.id }}" data-target-name="{{ p.name }}" {% if park.action_points < 2
-                                and park.turn_quota < 1 %}disabled{% endif %}>
+                            <button type="button" class="bg-error-container text-white font-bold text-[10px] px-3 py-1.5 hover:bg-error hover:text-white transition-all btn-open-attack active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed" data-target-id="{{ p.id }}" data-target-name="{{ p.name }}" {% if park.action_points < 2 and park.turn_quota < 1 %}disabled{% endif %}>
                                 {{ t('action.attack') }}
                             </button>
                         </td>
@@ -379,101 +583,136 @@
                     {% endfor %}
                 </tbody>
             </table>
-            {% if park.watchtowers == 0 %}
-            <p class="hint-text">{{ t('dash.watchtower_hint') }}</p>
-            {% endif %}
         </div>
+        {% if park.watchtowers == 0 %}
+        <p class="font-label-kr text-[11px] text-accent flex items-center gap-1 p-2 bg-accent/10 border border-accent/20">
+            <span class="material-symbols-outlined text-sm">info</span>
+            {{ t('dash.watchtower_hint') }}
+        </p>
+        {% endif %}
     </div>
 
-    {# === 하단 네비게이션 === #}
-    <div class="terminal-box" style="margin-top: 12px;">
-        <div class="box-content" style="display: flex; gap: 10px; justify-content: center;">
-            <a href="{{ url_for('game.ranking') }}" class="terminal-btn btn-action">{{ t('nav.ranking') }}</a>
-            <a href="{{ url_for('game.battle_logs') }}" class="terminal-btn btn-action">{{ t('nav.battle_logs') }}</a>
-            <a href="{{ url_for('game.trade_market') }}" class="terminal-btn btn-action">{{ t('nav.trade') }}</a>
+    <!-- Debug Turn Control (Debug only) -->
+    {% if config.DEBUG %}
+    <div class="bg-surface border-2 border-outline-variant p-panel-padding flex items-center justify-between">
+        <div class="font-code-critical text-xs text-on-surface-variant flex items-center gap-1.5">
+            <span class="material-symbols-outlined text-sm text-error">bug_report</span>
+            SYSTEM BACKDOOR ACTIVE (DEVELOPER ONLY)
         </div>
+        <form method="POST" action="{{ url_for('game.debug_next_turn') }}">
+            <button type="submit" class="px-4 py-1.5 bg-outline-variant border border-outline text-[#eeffe4] text-xs font-code-critical hover:bg-primary hover:text-background transition-all active:scale-95" id="btn-debug-turn">
+                ⚡ DEBUG: FORCE_NEXT_TURN
+            </button>
+        </form>
     </div>
+    {% endif %}
 
+    <!-- Bottom Navigation Bar (BBS Style Navigation) -->
+    <nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-stretch h-16 bg-surface border-t-2 border-outline-variant shadow-[0_-5px_15px_rgba(0,0,0,0.5)] inner-glow-primary">
+        <a href="{{ url_for('game.dashboard') }}" class="flex flex-col items-center justify-center bg-primary-container text-background font-bold w-1/4 border-r border-outline-variant/30 transition-all hover:brightness-110">
+            <span class="material-symbols-outlined">grid_view</span>
+            <span class="font-code-critical text-[10px] mt-1">DASHBOARD</span>
+        </a>
+        <a href="{{ url_for('game.ranking') }}" class="flex flex-col items-center justify-center text-on-surface-variant p-2 hover:bg-surface-container-high hover:text-primary transition-all w-1/4 border-r border-outline-variant/30">
+            <span class="material-symbols-outlined">leaderboard</span>
+            <span class="font-code-critical text-[10px] mt-1">RANKING</span>
+        </a>
+        <a href="{{ url_for('game.trade_market') }}" class="flex flex-col items-center justify-center text-on-surface-variant p-2 hover:bg-surface-container-high hover:text-primary transition-all w-1/4 border-r border-outline-variant/30">
+            <span class="material-symbols-outlined">swap_horiz</span>
+            <span class="font-code-critical text-[10px] mt-1">TRADE</span>
+        </a>
+        <a href="{{ url_for('game.skills_tree') }}" class="flex flex-col items-center justify-center text-on-surface-variant p-2 hover:bg-surface-container-high hover:text-primary transition-all w-1/4">
+            <span class="material-symbols-outlined">account_tree</span>
+            <span class="font-code-critical text-[10px] mt-1">SKILLS</span>
+        </a>
+    </nav>
+</main>
+
+<!-- Scout Results Modal -->
+<div id="scout-modal" class="hidden fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 bg-[#0a0f0a] border-2 border-outline p-6 min-w-[320px] max-w-[460px] shadow-[0_0_35px_rgba(51,255,51,0.25)]">
+    <div class="flex justify-between items-center border-b border-outline pb-2 mb-3">
+        <span class="font-code-critical text-mint font-bold flex items-center gap-1.5 text-xs uppercase" id="scout-title">
+            <span class="material-symbols-outlined text-sm">satellite_alt</span>
+            RECONNAISSANCE REPORT
+        </span>
+        <button onclick="document.getElementById('scout-modal').classList.add('hidden'); document.getElementById('modal-overlay').classList.add('hidden')" class="text-error font-bold text-sm cursor-pointer transition-transform hover:scale-110">[×]</button>
+    </div>
+    <div id="scout-content" class="font-code-critical text-xs leading-relaxed space-y-1.5 text-[#88cc88]"></div>
 </div>
 
-{# 정찰 모달 (AJAX) #}
-<div id="scout-modal"
-    style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); z-index:100; background:#0a0f0a; border:1px solid #225522; border-radius:3px; padding:16px; min-width:300px; max-width:450px; box-shadow:0 0 30px rgba(0,255,0,0.1);">
-    <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
-        <span style="color:#00ff88; font-weight:700;" id="scout-title">{{ t('action.scout_result') }}</span>
-        <button onclick="document.getElementById('scout-modal').style.display='none'"
-            style="background:none; border:none; color:#ff4444; cursor:pointer; font-size:14px;">[×]</button>
+<!-- Attack Unit Configuration Modal -->
+<div id="attack-modal" class="hidden fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 bg-[#0a0f0a] border-2 border-error/50 p-6 min-w-[340px] max-w-[480px] shadow-[0_0_35px_rgba(255,50,50,0.25)]">
+    <div class="flex justify-between items-center border-b border-error pb-2 mb-3">
+        <span class="font-code-critical text-error font-bold flex items-center gap-1.5 text-xs uppercase animate-pulse" id="attack-title">
+            <span class="material-symbols-outlined text-sm">swords</span>
+            MILITARY INVASION
+        </span>
+        <button onclick="closeAttackModal()" class="text-error font-bold text-sm cursor-pointer transition-transform hover:scale-110">[×]</button>
     </div>
-    <div id="scout-content" style="font-size:12px; color:#88cc88; line-height:1.6;"></div>
-</div>
-
-{# 침공 유닛 선택 모달 #}
-<div id="attack-modal"
-    style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); z-index:100; background:#0a0f0a; border:1px solid #552222; border-radius:3px; padding:16px; min-width:340px; max-width:460px; box-shadow:0 0 30px rgba(255,50,50,0.15);">
-    <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
-        <span style="color:#ff6666; font-weight:700;" id="attack-title">{{ t('attack.title') }}</span>
-        <button onclick="closeAttackModal()"
-            style="background:none; border:none; color:#ff4444; cursor:pointer; font-size:14px;">[×]</button>
-    </div>
-    <form method="POST" action="{{ url_for('game.attack') }}" id="attack-form">
+    <form method="POST" action="{{ url_for('game.attack') }}" id="attack-form" class="space-y-4">
         <input type="hidden" name="target_id" id="attack-target-id" value="0">
-        <div style="margin-bottom:10px; font-size:12px; color:#88cc88;">
-            <div style="margin-bottom:6px;">
-                {{ t('attack.send_guards') }}:
-                <input type="number" name="send_guards" id="send-guards" value="0" min="0"
-                    max="{{ [0, park.guard_count - park.defending_guards] | max }}" class="num-input"
-                    style="width:50px; margin-left:4px;" oninput="updateAttackPreview()">
-                <span class="cap-info">/ {{ [0, park.guard_count - park.defending_guards] | max }} {{
-                    t('attack.available') }}</span>
+        <div class="font-code-critical text-xs space-y-3.5">
+            <!-- Send Guards -->
+            <div class="flex items-center justify-between">
+                <span class="text-on-surface-variant flex items-center gap-1.5 font-bold">
+                    ⚔️ {{ t('attack.send_guards') }}:
+                </span>
+                <div class="flex items-center gap-2">
+                    <input type="number" name="send_guards" id="send-guards" value="0" min="0"
+                        max="{{ [0, park.guard_count - park.defending_guards] | max }}" class="bg-surface border border-outline px-2 py-1 w-16 text-center focus:ring-0" oninput="updateAttackPreview()">
+                    <span class="text-[10px] text-text-dim">/ {{ [0, park.guard_count - park.defending_guards] | max }}</span>
+                </div>
             </div>
-            <div style="margin-bottom:6px;">
-                {{ t('attack.send_adults') }}:
-                <input type="number" name="send_adults" id="send-adults" value="0" min="0"
-                    max="{{ [0, park.adult_count - park.defending_adults] | max }}" class="num-input"
-                    style="width:50px; margin-left:4px;" oninput="updateAttackPreview()">
-                <span class="cap-info">/ {{ [0, park.adult_count - park.defending_adults] | max }} {{
-                    t('attack.available') }}</span>
+            <!-- Send Adults -->
+            <div class="flex items-center justify-between">
+                <span class="text-on-surface-variant flex items-center gap-1.5 font-bold">
+                     성체 {{ t('attack.send_adults') }}:
+                </span>
+                <div class="flex items-center gap-2">
+                    <input type="number" name="send_adults" id="send-adults" value="0" min="0"
+                        max="{{ [0, park.adult_count - park.defending_adults] | max }}" class="bg-surface border border-outline px-2 py-1 w-16 text-center focus:ring-0" oninput="updateAttackPreview()">
+                    <span class="text-[10px] text-text-dim">/ {{ [0, park.adult_count - park.defending_adults] | max }}</span>
+                </div>
             </div>
-            <div
-                style="margin-top:8px; padding:6px; border:1px solid #553300; border-radius:2px; background:rgba(255,100,0,0.05);">
-                <label style="cursor:pointer; display:flex; align-items:center; gap:6px;">
-                    <input type="checkbox" name="boss_joins" id="boss-joins" onchange="updateAttackPreview()">
-                    <span>{{ t('attack.boss_join') }}</span>
+            <!-- Boss Joins -->
+            <div class="p-3 border border-[#553300] bg-[#ff6400]/5 space-y-2">
+                <label class="cursor-pointer flex items-center gap-2.5 text-xs text-primary font-bold">
+                    <input type="checkbox" name="boss_joins" id="boss-joins" onchange="updateAttackPreview()" class="focus:ring-0 bg-surface border-outline-variant">
+                    <span>👑 {{ t('attack.boss_join') }}</span>
                 </label>
-                <div style="font-size:10px; color:#ff6666; margin-top:4px;">
-                    {{ t('attack.boss_warning') }}
+                <div class="text-[10px] text-error leading-relaxed">
+                    🚨 {{ t('attack.boss_warning') }}
                 </div>
-                <div style="font-size:10px; color:#666; margin-top:2px;">
-                    {{ t('attack.boss_hp') }}: <strong style="color:#ffaa00;">{{ park.boss_hp }}/100</strong>
+                <div class="text-[10px] text-on-surface-variant">
+                    {{ t('attack.boss_hp') }}: <strong class="text-accent">{{ park.boss_hp }}/100</strong>
                 </div>
             </div>
         </div>
-        <div
-            style="margin-bottom:10px; padding:6px; border:1px solid #225522; border-radius:2px; font-size:11px; color:#aaddaa;">
-            <div>{{ t('attack.preview') }}: <strong style="color:#ff8800;" id="atk-preview">0</strong></div>
+        <!-- Attack Power Preview -->
+        <div class="p-2.5 bg-surface-container-lowest border border-outline-variant font-code-critical text-xs flex justify-between items-center">
+            <span class="text-on-surface-variant">{{ t('attack.preview') }}:</span>
+            <strong class="text-accent text-sm glow-sm" id="atk-preview">0</strong>
         </div>
-        <div style="display:flex; gap:8px;">
-            <button type="submit" class="terminal-btn btn-cull" id="btn-attack-submit" style="flex:1;">{{ t('attack.go')
-                }}</button>
-            <button type="button" class="terminal-btn" onclick="closeAttackModal()" style="flex:0.5;">{{
-                t('attack.cancel') }}</button>
+        <!-- Modal Actions -->
+        <div class="flex gap-2">
+            <button type="submit" class="flex-1 py-2 bg-error text-white font-bold text-xs uppercase hover:brightness-125 transition-all active:scale-95 text-center">{{ t('attack.go') }}</button>
+            <button type="button" class="flex-0.5 px-4 py-2 bg-outline-variant text-[#eeffe4] font-bold text-xs uppercase hover:brightness-125 transition-all active:scale-95 text-center" onclick="closeAttackModal()">{{ t('attack.cancel') }}</button>
         </div>
     </form>
 </div>
 
-<div id="modal-overlay"
-    style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:99;"
-    onclick="closeAllModals()"></div>
+<!-- Blur/Dim Modal Backdrop Overlay -->
+<div id="modal-overlay" class="hidden fixed inset-0 z-40 bg-black/60 backdrop-blur-sm transition-all" onclick="closeAllModals()"></div>
 
 <script>
-    // === 게임 상수 (Jinja2에서 전달) ===
+    // === Game configurations (from Jinja2) ===
     const POWER_GUARD = {{ GC.POWER_GUARD }};
     const POWER_ADULT = {{ GC.POWER_ADULT }};
     const POWER_BOSS = {{ GC.POWER_BOSS }};
     const MORALE_EFFECT = {{ GC.MORALE_COMBAT_EFFECT }};
     const PARK_MORALE = {{ park.morale }};
 
-    // [v1.4.0] i18n 문자열 (Jinja2→JS 전달)
+    // [v1.4.0] i18n Strings (for JS usage)
     const I18N = {
         scoutTitle: "{{ t('action.scout_result') }}",
         attackTitle: "{{ t('attack.title') }}",
@@ -494,203 +733,15 @@
         charging: "{{ t('dash.charging') }}"
     };
 
-    // === 모달 관리 ===
     function closeAllModals() {
-        document.getElementById('scout-modal').style.display = 'none';
-        document.getElementById('attack-modal').style.display = 'none';
-        document.getElementById('modal-overlay').style.display = 'none';
+        document.getElementById('scout-modal').classList.add('hidden');
+        document.getElementById('attack-modal').classList.add('hidden');
+        document.getElementById('modal-overlay').classList.add('hidden');
     }
+
     function closeAttackModal() {
-        document.getElementById('attack-modal').style.display = 'none';
-        document.getElementById('modal-overlay').style.display = 'none';
+        document.getElementById('attack-modal').classList.add('hidden');
+        document.getElementById('modal-overlay').classList.add('hidden');
     }
-
-    // === [v1.5.0] XSS 방지 유틸 함수 ===
-    // HTML 특수문자를 이스케이프하여 스크립트 주입을 원천 차단
-    function escapeHtml(str) {
-        if (typeof str !== 'string') return String(str);
-        const div = document.createElement('div');
-        div.textContent = str;
-        return div.innerHTML;
-    }
-
-    // === 정찰 버튼 처리 ===
-    document.querySelectorAll('.btn-scout').forEach(btn => {
-        btn.addEventListener('click', async () => {
-            const parkId = btn.dataset.parkId;
-            const parkName = btn.dataset.parkName;
-            try {
-                const res = await fetch(`{{ url_for('game.scout', target_id=0) }}`.replace('/0', '/' + parkId));
-                const data = await res.json();
-                const modal = document.getElementById('scout-modal');
-                const content = document.getElementById('scout-content');
-                document.getElementById('scout-title').textContent = `👁️ ${parkName}`;
-
-                // [v1.5.0] XSS 방지: 서버 응답 데이터를 이스케이프 처리
-                let html = `<p style="color:#ffaa00; margin-bottom:6px;">${escapeHtml(data.message)}</p>`;
-                const d = data.data;
-                html += `<div>🏠 ${escapeHtml(I18N.scoutPopulation)}: <strong>${Number(d.total_population)}</strong></div>`;
-
-                if (data.has_watchtower) {
-                    html += `<div>${escapeHtml(I18N.scoutGuards)}: <strong>${Number(d.guard_count)}</strong></div>`;
-                    html += `<div>${escapeHtml(I18N.scoutAdults)}: <strong>${Number(d.adult_count)}</strong></div>`;
-                    html += `<div>${escapeHtml(I18N.scoutChildren)}: <strong>${Number(d.child_count)}</strong></div>`;
-                    html += `<div>${escapeHtml(I18N.scoutBabies)}: <strong>${Number(d.baby_count)}</strong></div>`;
-                    html += `<div style="margin-top:4px;">${escapeHtml(I18N.scoutPower)}: <strong style="color:#ff8800;">${Number(d.total_combat_power)}</strong></div>`;
-                    html += `<div>🛡️ ${escapeHtml(I18N.scoutDefense)}: <strong>${Number(d.defense_power)}</strong></div>`;
-                    html += `<div>${escapeHtml(I18N.scoutWalls)}: <strong>${Number(d.walls)}</strong></div>`;
-                    html += `<div>${escapeHtml(I18N.scoutMorale)}: <strong>${Number(d.morale)}/100</strong></div>`;
-                } else {
-                    html += `<p style="color:#666; font-style:italic; margin-top:6px;">${escapeHtml(I18N.scoutNeedTower)}</p>`;
-                }
-
-                content.innerHTML = html;
-                modal.style.display = 'block';
-                document.getElementById('modal-overlay').style.display = 'block';
-            } catch (e) {
-                alert(I18N.scoutFail);
-            }
-        });
-    });
-
-    // === 침공 버튼 → 모달 열기 ===
-    document.querySelectorAll('.btn-open-attack').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const targetId = btn.dataset.targetId;
-            const targetName = btn.dataset.targetName;
-            document.getElementById('attack-target-id').value = targetId;
-            document.getElementById('attack-title').textContent = `⚔️ ${targetName}`;
-
-            // 기본값 초기화
-            document.getElementById('send-guards').value = document.getElementById('send-guards').max;
-            document.getElementById('send-adults').value = 0;
-            document.getElementById('boss-joins').checked = false;
-            updateAttackPreview();
-
-            document.getElementById('attack-modal').style.display = 'block';
-            document.getElementById('modal-overlay').style.display = 'block';
-        });
-    });
-
-    // === 전투력 미리보기 계산 ===
-    function updateAttackPreview() {
-        const guards = parseInt(document.getElementById('send-guards').value) || 0;
-        const adults = parseInt(document.getElementById('send-adults').value) || 0;
-        const bossJoins = document.getElementById('boss-joins').checked;
-
-        let power = guards * POWER_GUARD + adults * POWER_ADULT;
-        if (bossJoins) power += POWER_BOSS;
-
-        // 사기 보정 (근사값)
-        const moraleMult = 1.0 + (PARK_MORALE - 50) * MORALE_EFFECT / 50;
-        power = Math.max(1, Math.round(power * moraleMult));
-
-        document.getElementById('atk-preview').textContent = power;
-
-        // 출정 인원 0명이면 버튼 비활성화
-        const submitBtn = document.getElementById('btn-attack-submit');
-        if (guards + adults === 0 && !bossJoins) {
-            submitBtn.disabled = true;
-            submitBtn.textContent = I18N.attackSelectUnit || '⚔️ ...';
-        } else {
-            submitBtn.disabled = false;
-            submitBtn.textContent = I18N.attackGo;
-        }
-    }
-
-    // ============================================================
-    // [v0.4.0] 실시간 알림 폴링 (10초마다 서버 확인)
-    // ============================================================
-    (function () {
-        let lastNotifId = 0;
-        const POLL_INTERVAL = 10000;
-        const container = document.createElement('div');
-        container.id = 'notif-container';
-        container.style.cssText = 'position:fixed; top:10px; right:10px; z-index:9999; display:flex; flex-direction:column; gap:6px; max-width:320px;';
-        document.body.appendChild(container);
-
-        const typeStyle = {
-            'battle': { icon: '⚔️', color: '#ff4444', bg: 'rgba(255,68,68,0.15)' },
-            'trade': { icon: '📦', color: '#ffaa00', bg: 'rgba(255,170,0,0.15)' },
-            'diplomacy': { icon: '🤝', color: '#44aaff', bg: 'rgba(68,170,255,0.15)' },
-        };
-
-        function showToast(notif) {
-            const style = typeStyle[notif.type] || { icon: '📢', color: '#aaa', bg: 'rgba(170,170,170,0.15)' };
-            const toast = document.createElement('div');
-            toast.style.cssText = `
-                background: ${style.bg};
-                border: 1px solid ${style.color};
-                border-radius: 4px;
-                padding: 8px 12px;
-                color: #aaddaa;
-                font-size: 12px;
-                animation: slide-in 0.3s ease;
-                cursor: pointer;
-                backdrop-filter: blur(4px);
-            `;
-            // [v1.5.0] XSS 방지: innerHTML 대신 안전한 DOM 구성
-            const iconSpan = document.createElement('span');
-            iconSpan.style.fontSize = '14px';
-            iconSpan.textContent = style.icon;
-            const msgSpan = document.createElement('span');
-            msgSpan.textContent = ' ' + notif.message;
-            toast.appendChild(iconSpan);
-            toast.appendChild(msgSpan);
-            toast.onclick = () => toast.remove();
-            container.appendChild(toast);
-            setTimeout(() => {
-                toast.style.opacity = '0';
-                toast.style.transition = 'opacity 0.5s';
-                setTimeout(() => toast.remove(), 500);
-            }, 5000);
-        }
-
-        async function pollNotifications() {
-            try {
-                const res = await fetch('/game/api/notifications?last_id=' + lastNotifId);
-                const data = await res.json();
-                if (data.notifications && data.notifications.length > 0) {
-                    data.notifications.forEach(n => {
-                        showToast(n);
-                        if (n.id > lastNotifId) lastNotifId = n.id;
-                    });
-                }
-            } catch (e) { }
-        }
-
-        fetch('/game/api/notifications?last_id=0')
-            .then(r => r.json())
-            .then(data => {
-                if (data.notifications && data.notifications.length > 0) {
-                    lastNotifId = Math.max(...data.notifications.map(n => n.id));
-                }
-            })
-            .catch(() => { });
-
-        setInterval(pollNotifications, POLL_INTERVAL);
-    })();
-
-    // [v1.2.0] 턴 카운트다운 타이머
-    (function () {
-        const timerEl = document.getElementById('turnTimer');
-        if (!timerEl) return;
-        let seconds = parseInt(timerEl.dataset.seconds || '0');
-        const countdownEl = document.getElementById('turnCountdown');
-
-        function updateCountdown() {
-            if (seconds <= 0) {
-                countdownEl.textContent = I18N.charging || '...';
-                setTimeout(() => location.reload(), 1000);
-                return;
-            }
-            const min = Math.floor(seconds / 60);
-            const sec = seconds % 60;
-            countdownEl.textContent = `${min}:${sec.toString().padStart(2, '0')}`;
-            seconds--;
-            setTimeout(updateCountdown, 1000);
-        }
-        updateCountdown();
-    })();
 </script>
 {% endblock %}

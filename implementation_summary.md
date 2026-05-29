@@ -1,7 +1,7 @@
 # 실장석 공원 제국 - 구현 요약 (implementation_summary.md)
 
-> **문서 버전**: v1.6.3  
-> **마지막 갱신**: 2026-05-29  
+> **문서 버전**: v1.7.0  
+> **마지막 갱신**: 2026-05-30  
 > **상태**: 동결(Frozen)  
 > **표준**: `AI_IMPLEMENTATION_DOC_STANDARD.md` 및 `spec.md` 파생  
 
@@ -56,8 +56,8 @@ DOMContentLoaded → 메시지 자동 소멸 타이머 → confirm 이벤트 바
 | **대사/i18n** | `app/dialogues.py` | `_DialogueProxy`, `get_random_dialogue()`, `get_random_dialogues()` |
 | **번역 시스템** | `app/i18n.py` | `get_text()`, `init_i18n()`, `set_lang()` |
 | **UI 스타일** | `app/static/css/style.css` | CSS 변수, 그리드, 반응형, 애니메이션 |
-| **클라이언트 로직** | `app/static/js/game.js` | 메시지 소멸, confirm, 반짝임, 타이핑, 입력 검증, 건설 설명 |
-| **템플릿** | `app/templates/*.html` | Jinja2 상속 구조 (base → 각 페이지) |
+| **클라이언트 로직** | `app/static/js/game.js` | 메시지 소멸, confirm, 반짝임, 타이핑, 입력 검증, 건설 설명, 모달 트랜지션, 스킬 트리 인터랙션 |
+| **템플릿** | `app/templates/*.html` | Jinja2 상속 구조 (base → 각 페이지 + skills.html 모크업 추가) |
 
 ---
 
@@ -97,22 +97,23 @@ DOMContentLoaded → 메시지 자동 소멸 타이머 → confirm 이벤트 바
 | `app/dialogues.py` | 169 | 대사 로더 | JSON 파일 경로/인코딩(UTF-8) |
 | `app/i18n.py` | 110 | 번역 시스템 | `app.context_processor` 등록 |
 | `app/routes/auth_routes.py` | 150 | 인증 라우트 | XSS 입력 검증 유지 |
-| `app/routes/game_routes.py` | 1045 | 게임 라우트 | Race Condition 방지 패턴 유지 |
+| `app/routes/game_routes.py` | 1057 | 게임 라우트 | Race Condition 방지 패턴 유지 |
 
 ### 4.2 프론트엔드 파일
 
 | 파일 | 라인수 | 책임 | 변경 시 주의 |
 |------|--------|------|-------------|
-| `app/static/css/style.css` | 1485 | 전체 스타일 | 반응형 미디어 쿼리 3개(768, 480) |
-| `app/static/js/game.js` | 112 | 클라이언트 로직 | `confirm()` 메시지 한국어 고정 |
-| `app/templates/base.html` | 69 | 기본 레이아웃 | CSRF meta 태그, 언어 선택 |
-| `app/templates/dashboard.html` | 696 | 메인 화면 | Jinja2 변수명과 모델 필드 동기화 |
-| `app/templates/trade.html` | 313 | 교역/외교 | 폼 action URL 동기화 |
-| `app/templates/ranking.html` | 103 | 랭킹 | 정렬 기준 파라미터 |
-| `app/templates/battle_logs.html` | 49 | 전투 기록 | 로그 포맷 |
-| `app/templates/login.html` | 42 | 로그인 | `t('key')` 키 존재 확인 |
-| `app/templates/register.html` | 50 | 회원가입 | 입력 제한(minlength/maxlength) |
-| `app/templates/gameover.html` | 49 | 게임오버 | 통계 필드 |
+| `app/static/css/style.css` | 1508 | 전체 스타일 | 반응형 미디어 쿼리 3개(768, 480) |
+| `app/static/js/game.js` | 203 | 클라이언트 로직 | `confirm()` 메시지 한국어 고정 |
+| `app/templates/base.html` | 113 | 기본 레이아웃 | CSRF meta 태그, 언어 선택 |
+| `app/templates/dashboard.html` | 746 | 메인 화면 | Jinja2 변수명과 모델 필드 동기화 |
+| `app/templates/trade.html` | 451 | 교역/외교 | 폼 action URL 동기화 |
+| `app/templates/ranking.html` | 102 | 랭킹 | 정렬 기준 파라미터 |
+| `app/templates/battle_logs.html` | 48 | 전투 기록 | 로그 포맷 |
+| `app/templates/login.html` | 41 | 로그인 | `t('key')` 키 존재 확인 |
+| `app/templates/register.html` | 49 | 회원가입 | 입력 제한(minlength/maxlength) |
+| `app/templates/gameover.html` | 83 | 게임오버 | 통계 필드 |
+| `app/templates/skills.html` | 277 | 스킬 트리 | [NEW] 가상 스킬 트리 이스터에그 모크업 |
 
 ### 4.3 데이터 파일
 
@@ -273,6 +274,13 @@ WHERE id = park.id AND konpeito >= offer_k AND ...
 16. 밸런스 수정 → `app/config.py`만 변경
 17. 새 행동 추가 → `game_engine.py` 함수 + `game_routes.py` 라우트 + `dashboard.html` 폼
 18. 새 UI 추가 → `dashboard.html` 또는 별도 템플릿 + CSS
+
+### Phase F: UI/UX 리팩토링 및 Gore-Terminal 최적화
+19. `base.html`에 Tailwind CSS CDN 및 커스텀 격자/글로우 설정 반영
+20. `dashboard.html` 그리드 재배치 및 실장석 도트 아바타, 6단 AP 게이지 구현
+21. `trade.html` 교역소/외교 BBS 고밀도 탭 UI 마이그레이션
+22. `skills.html` 가상 스킬 트리 이스터에그 템플릿 추가 및 JS SP 카운터 연결
+23. 브라우저 크기 조절을 통한 반응형 적합성 및 정합성 검증
 
 ---
 
