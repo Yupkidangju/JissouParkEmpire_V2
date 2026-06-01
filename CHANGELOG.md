@@ -13,13 +13,13 @@
 
 ### 추가됨 (Added)
 - **Node.js 런타임 융합형 프론트엔드 XSS 헬퍼 교차 검증 및 정적 innerHTML 안전성 스캔 회귀 테스트 도입**: `tests/test_regression.py` 하단에 로컬 Node.js `v24.14.1` 런타임을 `subprocess`로 결합 기동하여 `app/static/js/game.js`로부터 추출한 `escapeHtml` 헬퍼의 치환 정합성을 교차 확인하고, `game.js` 내의 주요 `innerHTML` 동적 대입문 및 데이터 빌더 블록 내부의 백틱 템플릿 리터럴 보간 항목에서 `escapeHtml` 등 안전 가드가 누락되었는지를 정밀 Regex로 정적 분석하는 신규 회귀 검증 테스트를 수립하여 보안 안전성을 보완했습니다.
-- **SQLite 2중 SQLAlchemy 세션 기반 Lost Update Race Condition 회귀 테스트 도입**: SQLite의 `with_for_update()` 비관적 락 no-op 한계를 극복하고 stale read/stale write-back 상황에서의 논리적 lost update 가드(`session.refresh` 및 트랜잭션 격리)를 실질적으로 검증할 수 있도록, 두 개의 독립된 세션을 동시에 가동하여 lost update 차단을 100% 그린 패스로 증명하는 신규 동시성 테스트를 추가했습니다.
+- **SQLite 2중 SQLAlchemy 세션 기반 Lost Update Race Condition 회귀 테스트 도입**: SQLite의 `with_for_update()` 비관적 락 no-op 한계를 극복하고 stale read/stale write-back 상황에서의 논리적 lost update 가드(`session.refresh` 및 트랜잭션 격리)를 실질적으로 검증할 수 있도록, 두 개의 독립된 세션을 동시에 가동하여 lost update 방지를 그린 패스로 증명하는 신규 동시성 테스트를 추가했습니다.
 - **감사 보고서 대응 표준 조치 기록 템플릿(4-Tier) 도입**: Hold 지적 사항에 대해 '조치내용/처리방법/남은위협/감사에게 요청할 사항'을 상세 기록하고 Status를 `Verified / Fixed`로 변경하도록 규격화하여 `lessons_learned.md`에 영구 표준으로 정립했습니다.
 
 ### 수정됨 (Fixed)
 - **개발 서버 바인딩 루프백 락다운 및 환경변수 opt-in 적용**: clean env 실행 시 `run.py`가 Flask 개발 서버를 `0.0.0.0`으로 기동하여 로컬 LAN 네트워크상에 debug console 백도어가 노출되던 보안 결함을 수정하여 기본 바인딩 host를 `127.0.0.1`로 락다운하고, 외부 바인딩이 필요할 때만 `FLASK_RUN_HOST` 환경변수로 opt-in 하도록 개편했습니다.
 - **프로덕션 환경변수 감지 시 하드 락다운(Fail-Closed/Hard Lockdown) 적용**: `FLASK_ENV=production` 또는 `ENV_TYPE=production` 설정이 감지되는 경우, 개발자가 실수로 `DEBUG=true`를 활성화하더라도 디버거를 강제로 차단(False)하고, `SECRET_KEY`가 누락된 경우 임시 난수 fallback 없이 즉각 `ValueError`를 발생시키며 안전 실패(Fail-Closed) 상태로 구동을 강제 정지시키는 논리 장벽을 강화했습니다.
-- **품질 게이트 whitespace/공백 100% 정제**: `git diff --check` 검증 시 실패를 야기하던 `BUILD_GUIDE.md`, `app/config.py` 등 모든 파일의 불필요한 trailing whitespace 및 EOF blank line을 전수 제거하여 품질 품질 게이트를 원천 통과시켰습니다.
+- **품질 게이트 whitespace/공백 고도 정제**: `git diff --check` 검증 시 실패를 야기하던 `BUILD_GUIDE.md`, `app/config.py` 등 모든 파일의 불필요한 trailing whitespace 및 EOF blank line을 전수 제거하여 품질 품질 게이트를 통과시켰습니다.
 - **NPC 턴 진행 2단계 트랜잭션 경계 분리를 통한 교착 상태(Deadlock) 및 DB 커넥션 고갈 고도 예방**: 턴 동기화 스케줄러 `_sync_npc_turns()` 레벨에서 NPC 기본 턴 처리(`process_turn`) 완료 즉시 명시적인 `db.session.commit()`을 강제하여 선점 락을 원천 소멸한 뒤, 독립된 트랜잭션 경계 하에 `process_npc_turn()`을 구동하는 **2단계 트랜잭션 경계 분리 구조**를 전격 채택 및 적용했습니다. 또한 `process_npc_turn()` 시작 시점에서의 무조건적 락 선점을 영구 배제하고 단순 `db.session.refresh(park)`로 완화하여, NPC 공격 행동 기동 시 오직 `execute_battle()` 내부에서만 두 공원의 락을 ID 오름차순(Canonical Ordering) 순으로 안전하게 동시 획득하도록 보장함으로써 락 순서 역전 교착 상태 취약점`[DEADLOCK-F005]`과 DB 커넥션 풀 고갈 결함 발생 위험을 강력히 예방했습니다.
 - **SQLite Engine Pragma 이벤트 리스너 기반 WAL/busy_timeout pragma 자동 주입**: 기본 배포 DB인 SQLite 환경에서 `with_for_update()` no-op(FOR UPDATE SQL 미생성) 제약을 극복하고 Database Locked(DB 잠금) 오류를 예방하기 위해, SQLAlchemy `Engine` 'connect' 이벤트 리스너를 수립하여 SQLite 연결 즉시 `PRAGMA journal_mode=WAL` 및 `PRAGMA busy_timeout=5000` pragma를 데이터베이스 연결 시점에 자동으로 강제 주입 활성화하였습니다.
 - **프로덕션 안전 실패(Fail-Closed) 비밀키 보안 정책 탑재**: 프로덕션(DEBUG=False) 환경에서 `SECRET_KEY` 또는 `FLASK_SECRET_KEY` 환경변수가 누락되었을 경우, 기존처럼 무작위 난수 키 fallback으로 구동하여 Gunicorn 다중 워커 간의 세션 불일치와 미지정 구동 취약점을 방치하는 대신, 즉각 `ValueError` 예외를 터뜨리고 가동을 강제 중단하는 안전 실패(Fail-Closed) 보안 모델을 탑재했습니다. (개발/테스트 환경에서는 기존 난수 자동 생성 fallback 유지)
@@ -30,7 +30,7 @@
 ## [1.8.8] - 2026-05-31
 
 ### 수정됨 (Fixed)
-- **턴 소비 슬로우 패스(Slow-path) AP 복제 Lost Update 취약점 차단**: `consume_turn()`에서 AP 부족으로 슬로우 패스가 수행될 때, 턴 쿼터 차감 및 턴 진행(`process_turn`) 후 AP가 10으로 완전히 리셋된 상태에서 일시적으로 락이 풀리는 현상을 악용하여 다중 비동기 요청(패스트 패스)으로 AP를 선차감한 이력을 Stale AP 정보로 덮어쓰던 동시성 결함을 해결했습니다. 슬로우 패스의 모든 턴 진행 및 `_sync_npc_turns()` 동기화 처리가 끝난 직후이자 최종 AP 차감 직전에 **플레이어 공원에 대해 2차 비관적 락(`with_for_update()`) 및 `db.session.refresh(park)`를 명시적으로 실행**하도록 아키텍처를 개선하여, 동기화 갭 동안 차감된 최신 AP 수치를 DB로부터 완벽히 새로고침한 뒤 최종 AP 연산이 원자적으로 수행되도록 보장했습니다. (audit_report_56.md [STATE-F029])
+- **턴 소비 슬로우 패스(Slow-path) AP 복제 Lost Update 취약점 차단**: `consume_turn()`에서 AP 부족으로 슬로우 패스가 수행될 때, 턴 쿼터 차감 및 턴 진행(`process_turn`) 후 AP가 10으로 고도로 리셋된 상태에서 일시적으로 락이 풀리는 현상을 악용하여 다중 비동기 요청(패스트 패스)으로 AP를 선차감한 이력을 Stale AP 정보로 덮어쓰던 동시성 결함을 해결했습니다. 슬로우 패스의 모든 턴 진행 및 `_sync_npc_turns()` 동기화 처리가 끝난 직후이자 최종 AP 차감 직전에 **플레이어 공원에 대해 2차 비관적 락(`with_for_update()`) 및 `db.session.refresh(park)`를 명시적으로 실행**하도록 아키텍처를 개선하여, 동기화 갭 동안 차감된 최신 AP 수치를 DB로부터 새로고침한 뒤 최종 AP 연산이 원자적으로 수행되도록 보장했습니다. (audit_report_56.md [STATE-F029])
 
 ## [1.8.7] - 2026-05-31
 
@@ -41,7 +41,7 @@
 ## [1.8.6] - 2026-05-31
 
 ### 수정됨 (Fixed)
-- **NPC 턴 동기화 루프 내 DB 커밋으로 인한 비관적 락 유실 및 Lost Update 차단**: `_sync_npc_turns`에서 모든 NPC를 일괄 `with_for_update().all()`로 가져온 뒤 루프 내에서 `commit()`하는 기존 구조로 인해, 첫 번째 NPC 커밋 시 나머지 NPC들의 락이 조기 해제되어 타 스레드가 개입해 턴을 중복 수행하는 결함을 수정함. 루프 외부에서는 ID 목록만 추출하고, 루프 내부에서 **개별 트랜잭션 단위로 각 NPC 공원을 비관적 락 조회(`with_for_update()`) 및 commit**하도록 트랜잭션 경계를 완전히 분리 격리하여 Lost Update를 차단함. (audit_report_54.md [STATE-F028])
+- **NPC 턴 동기화 루프 내 DB 커밋으로 인한 비관적 락 유실 및 Lost Update 차단**: `_sync_npc_turns`에서 모든 NPC를 일괄 `with_for_update().all()`로 가져온 뒤 루프 내에서 `commit()`하는 기존 구조로 인해, 첫 번째 NPC 커밋 시 나머지 NPC들의 락이 조기 해제되어 타 스레드가 개입해 턴을 중복 수행하는 결함을 수정함. 루프 외부에서는 ID 목록만 추출하고, 루프 내부에서 **개별 트랜잭션 단위로 각 NPC 공원을 비관적 락 조회(`with_for_update()`) 및 commit**하도록 트랜잭션 경계를 고도로 분리 격리하여 Lost Update를 차단함. (audit_report_54.md [STATE-F028])
 - **NPC AI 행동 내부 예외 발생 시 비관적 락 유실 및 무한 턴(Stampede) 방어**: NPC의 개별 행동 시도 중 예외 발생 시 전체 트랜잭션을 `rollback()`하여 진입 시 획득했던 공원의 비관적 락까지 유실되고 턴 충전 수치가 소실되던 아키텍처적 결함을 해결함. 행동 호출 부에 **Nested Transaction (Savepoint, `begin_nested()`)** 격리망을 구축하여 예외 발생 시 오직 실패한 그 행동의 상태만 롤백하고 부모 트랜잭션과 비관적 락, 그리고 이전 단계의 턴 정보(`turn_count`)를 유실 없이 완전 보존하도록 보강함. (audit_report_54.md [TRANSACTION-F005])
 - **밀사 사보타주 피해량 산정 TOCTOU 방지 및 2-Way Lock 격리**: 밀사가 적 공원에 사보타주를 기동하여 자원/유닛 피해를 유발할 때, 피해 산정 시점과 실제 쿼리 실행 간의 격차로 인해 로그 상의 소실량과 실제 반영 데이터가 불일치하는 결함을 해결함. 임무 성공 여부 판단 및 피해량 연산 시작 전 두 공원에 대해 ID 정렬 2중 비관적 락을 먼저 획득하도록 보완하여 무결성을 강제함. (audit_report_54.md [LOGIC-F021])
 
@@ -65,14 +65,14 @@
 ## [1.8.2] - 2026-05-31
 
 ### 수정됨 (Fixed)
-- **비원자적 행동 실패 시 AP 누수 해결을 위한 보상 트랜잭션 구현**: `consume_turn()`에서 AP를 선행 차감 및 커밋한 후 실제 행동(채집, 출산, 건설, 훈련, 침공)의 내부 유효성 검사 실패나 자원 차감 실패 등으로 행동이 중단(`not success`)될 때, 이미 차감된 AP를 안전하게 복구해주는 `game_engine.refund_ap()` 공용 보상 트랜잭션 헬퍼를 도입하여 각 행동 라우트에 긴밀하게 연동함. 이를 통해 AP 누수(AP Leakage / Ghost Deduction) 현상을 완전히 해결함 (audit_report_49.md [STATE-F023])
+- **비원자적 행동 실패 시 AP 누수 해결을 위한 보상 트랜잭션 구현**: `consume_turn()`에서 AP를 선행 차감 및 커밋한 후 실제 행동(채집, 출산, 건설, 훈련, 침공)의 내부 유효성 검사 실패나 자원 차감 실패 등으로 행동이 중단(`not success`)될 때, 이미 차감된 AP를 안전하게 복구해주는 `game_engine.refund_ap()` 공용 보상 트랜잭션 헬퍼를 도입하여 각 행동 라우트에 긴밀하게 연동함. 이를 통해 AP 누수(AP Leakage / Ghost Deduction) 현상을 고도로 해결함 (audit_report_49.md [STATE-F023])
 - **외교 및 밀사 환불 로직의 공용 헬퍼 일원화**: 기존 `/diplomacy/enemy` 및 `/spy` 라우트 내부에서 SQL `update` 문을 직접 수행하여 개별 처리하던 환불 코드를 `game_engine.refund_ap()` 호출로 리팩토링하여 복구 정합성을 획기적으로 개선함. 특히 적대 선언 시 이미 적대 관계인 경우(`existing_enemy` 존재 시)에도 AP가 정상 복구되도록 보안 취약점을 추가적으로 차단함.
 
 ## [1.8.1] - 2026-05-31
 
 ### 수정됨 (Fixed)
 - **프로세스 장벽 동시성 제어 확보 및 Gunicorn 락 우회 차단**: 다중 워커 프로세스 환경에서 스레드 락(`threading.Lock()`)의 무력함을 극복하고, 교역 생성(`trade_create`) 및 NPC 동기 턴 진행(`_sync_npc_turns`) 시에 데이터베이스 레벨의 **비관적 락(`with_for_update()`)** 및 일관된 id 정렬(데드락 방지)을 획득하도록 개편하여 교역 등록 제한 우회 및 동일 NPC의 턴 중복 처리(NPC Stampede) 밸런스 붕괴를 완벽하게 차단함 (audit_report_48.md [LOGIC-F019])
-- **NPC 턴 트랜잭션 원자화 및 Lost Update 수정**: NPC의 소규모 자연 성장(`_npc_passive_growth`)을 `case()` 기반의 단일 원자적 `UPDATE`로 전환하여 `autoflush` 발동 시 메모리 상의 구버전 데이터로 플레이어의 공격/약탈 결과를 덮어쓰는(Lost Update) 문제를 해결하였고, 범용 엔진 함수(`action_gather`, `action_birth`, `action_build`, `action_train`, `action_cull`)에 `commit=True` 매개변수를 도입하여 NPC 행동 시 중간 커밋을 억제하고 단일 NPC 턴 전체가 완전히 원자적인 트랜잭션 안에서 수행 및 롤백될 수 있도록 구조를 개편함 (audit_report_48.md [STATE-F022])
+- **NPC 턴 트랜잭션 원자화 및 Lost Update 수정**: NPC의 소규모 자연 성장(`_npc_passive_growth`)을 `case()` 기반의 단일 원자적 `UPDATE`로 전환하여 `autoflush` 발동 시 메모리 상의 구버전 데이터로 플레이어의 공격/약탈 결과를 덮어쓰는(Lost Update) 문제를 해결하였고, 범용 엔진 함수(`action_gather`, `action_birth`, `action_build`, `action_train`, `action_cull`)에 `commit=True` 매개변수를 도입하여 NPC 행동 시 중간 커밋을 억제하고 단일 NPC 턴 전체가 고도로 원자적인 트랜잭션 안에서 수행 및 롤백될 수 있도록 구조를 개편함 (audit_report_48.md [STATE-F022])
 
 ## [1.8.0] - 2026-05-31
 

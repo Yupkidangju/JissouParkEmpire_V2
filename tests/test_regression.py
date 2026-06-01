@@ -394,15 +394,11 @@ def test_static_js_inner_html_xss_protection():
             assert "escapeHtml(" in value_stripped or "parseInt(" in value_stripped or "parseFloat(" in value_stripped, \
                 f"XSS 취약점 검출! game.js의 innerHTML 동적 대입 중 안전 가드(escapeHtml) 누락: {value_stripped}"
 
-    # 2. [v1.8.9 고도화] game.js 내의 모든 innerHTML 관련 백틱(`...`) 템플릿 리터럴 전수 조사 (html builder 및 누적 += 보간 포함)
-    # 실제 innerHTML 대입문 혹은 데이터 빌더가 밀집된 try 블록(98~137라인) 및 attack-title 대입라인(153라인)만 추출하여 검사합니다.
-    lines = js_content.splitlines()
-    scout_block = "\n".join(lines[97:137])  # 98라인부터 137라인까지
-    attack_line = lines[152]  # 153라인
-    target_js_block = scout_block + "\n" + attack_line
-
-    # 해당 융합형 HTML 빌더 블록 내부의 모든 백틱 템플릿 리터럴을 쿼리
-    template_literals = re.findall(r'`(.*?)(?<!\\)`', target_js_block, re.DOTALL)
+    # 2. [v1.8.9 고도화] game.js 내의 모든 innerHTML 및 HTML 빌더 관련 백틱(`...`) 템플릿 리터럴 전수 조사
+    # 특정 라인 슬라이스 의존성을 완전히 탈피하여 파일 구조 변경에도 견고하게 작동하도록 전사적 정적 분석을 수행합니다.
+    # innerHTML 대입 혹은 html 변수(HTML builder) 누적에 사용되는 백틱 블록만 추출하여 confirm 등 텍스트 확인창의 오탐을 배제합니다.
+    template_matches = re.findall(r'(\bhtml\s*\+?=\s*`|innerHTML\s*=\s*`)(.*?)(?<!\\)`', js_content, re.DOTALL)
+    template_literals = [match[1] for match in template_matches]
     for template in template_literals:
         # 템플릿 자체가 API URL 형식(/...)이면 스킵하여 오탐지 방지
         template_stripped = template.strip()

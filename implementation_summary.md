@@ -291,7 +291,7 @@ def before_spy_delete(mapper, connection, target):
 ### 5.12 NPC 개별 트랜잭션 격리 및 Savepoint(Nested) 예외 가드 (v1.8.6)
 - **일괄 처리 트랜잭션의 루프 개별 격리**:
   - `_sync_npc_turns`에서 모든 NPC를 한 번에 조회하여 락을 얻는 기존 방식은 루프 내부의 `db.session.commit()`이 실행될 때 아직 처리되지 않은 다른 NPC들의 락도 해제되는 아키텍처적 결함이 있었습니다.
-  - 이를 해결하기 위해 루프 외부에서는 단지 정렬된 NPC ID 목록만 추출하고, 루프 내부에서 개별적으로 `with_for_update().first()`를 다시 쿼리하고 독립된 `commit()`을 기동하여 개별 트랜잭션 단위로 완전히 격리되도록 구현했습니다.
+  - 이를 해결하기 위해 루프 외부에서는 단지 정렬된 NPC ID 목록만 추출하고, 루프 내부에서 개별적으로 `with_for_update().first()`를 다시 쿼리하고 독립된 `commit()`을 기동하여 개별 트랜잭션 단위로 고도로 격리되도록 구현했습니다.
 - **Nested Transaction (Savepoint)을 통한 비관적 락 보존**:
   - NPC 행동 도중 발생한 예외가 전체 트랜잭션을 롤백하게 되면 락이 유실되고 턴 진행 내역마저 소실되어 무한 스탬피드 버그를 일으켰습니다.
   - 이를 방어하고자 루프 내부의 각 행동 단계마다 `db.session.begin_nested()` 세이브포인트를 생성하여, 예외 발생 시 오직 실패한 그 행동의 상태만 롤백하고 부모 트랜잭션과 비관적 락은 안전하게 보존하도록 조치했습니다.
@@ -333,9 +333,9 @@ def before_spy_delete(mapper, connection, target):
 - **밀사 복귀 인구 수용 한도 초과 처리의 Lost Update 예방**:
   - `_process_spy_missions`의 끝단에서 밀사 귀환 등으로 인한 수용 한도 초과를 연산하기 위해 `_process_overcrowding(park)`을 호출할 때, 비관적 락 없이 단순 `refresh` 및 메모리 변경 후 `commit`을 구동하여 concurrent 요청(채집/교역)에 의한 DB 상태 변경을 메모리 구버전 데이터로 덮어쓰던(Lost Update) 결함을 제거했습니다.
 - **인메모리 연산 직전의 2차 비관적 락 및 refresh 동기화 구현**:
-  - 과밀도 정화 처리 진입 직전에 플레이어 공원에 대해 다시 한 번 `with_for_update()` 비관적 락을 획득하고 `db.session.refresh(park)`를 명시적으로 실행하여, 데이터 덮어쓰기 레이스 컨디션을 완전히 차단하고 병렬 요청과의 데이터 정합성 무결성을 강제했습니다.
+  - 과밀도 정화 처리 진입 직전에 플레이어 공원에 대해 다시 한 번 `with_for_update()` 비관적 락을 획득하고 `db.session.refresh(park)`를 명시적으로 실행하여, 데이터 덮어쓰기 레이스 컨디션을 정밀하게 예방하고 병렬 요청과의 데이터 정합성 무결성을 강제했습니다.
 
-### 5.18 NPC 턴 진행 및 행동 AI 2단계 트랜잭션 경계 분리를 통한 교착 상태(Deadlock) 결함 [DEADLOCK-F005] 완치 요약 (v1.8.9)
+### 5.18 NPC 턴 진행 및 행동 AI 2단계 트랜잭션 경계 분리를 통한 교착 상태(Deadlock) 결함 [DEADLOCK-F005] 고도 예방 요약 (v1.8.9)
 - **_sync_npc_turns()의 2단계 트랜잭션 경계 분리 도입**:
   - 턴 동기화 스케줄러 실행 도중 NPC 기본 턴 처리(`process_turn`) 완료 즉시 명시적인 `db.session.commit()`을 수행하여 선점 락을 원천 소멸시킨 후, 깨끗하게 락이 비워진 상태에서 NPC AI 행동 의사결정 및 공격 기동(`process_npc_turn`)에 진입하는 **2단계 트랜잭션 경계 분리 구조**를 전격 도입했습니다.
 - **NPC 행동 최상단 비관적 락(Pessimistic Lock) 완화 제거**:
@@ -345,7 +345,7 @@ def before_spy_delete(mapper, connection, target):
   - 2단계 분리 및 최상단 비관적 락 해제를 통해, NPC가 공격 기동 시 오직 `execute_battle()` 내부에서만 두 공원의 락을 Canonical Ordering(오름차순)으로 안전하게 동시 획득하여 교착 상태 `[DEADLOCK-F005]` 및 DB 커넥션 풀 고갈 결함 발생 위험을 강력히 예방했습니다.
 - **설계적 절충(Trade-off) 및 DB별 격리 보증 명문화**:
   - **Lock-free Gap 절충**: 이 2단계 분리 구조로 인해 NPC 행동 의사결정 및 전투 개시 직전에 발생하는 미세한 무락 갭(Lock-free Gap)은, NPC 행동 결정 시점에 플레이어의 자원 수치가 다소 변할 수 있으나 데드락 회피를 위해 감수한 의도된 설계적 절충(Trade-off)입니다.
-  - **SQLite WAL 및 busy_timeout pragma 실제 활성화**: 기본 배포 DB인 SQLite 환경에서 발생할 수 있는 no-op `with_for_update()` 제약을 극복하고 Database Locked 오류를 예방하기 위해, `Engine` 커넥션 이벤트 리스너를 수립하여 연결 즉시 `PRAGMA journal_mode=WAL` 및 `PRAGMA busy_timeout=5000` 설정을 데이터베이스 연결 시점에 강제 자동 주입하도록 완치했습니다.
+  - **SQLite WAL 및 busy_timeout pragma 실제 활성화**: 기본 배포 DB인 SQLite 환경에서 발생할 수 있는 no-op `with_for_update()` 제약을 극복하고 Database Locked 오류를 예방하기 위해, `Engine` 커넥션 이벤트 리스너를 수립하여 연결 즉시 `PRAGMA journal_mode=WAL` 및 `PRAGMA busy_timeout=5000` 설정을 데이터베이스 연결 시점에 강제 자동 주입하도록 보완했습니다.
   - **Row-Lock DB 프로덕션 이주 확장성**:
     - 향후 Gunicorn 다중 워커 프로덕션 환경 하에 PostgreSQL/MySQL 등 실제 행 락 RDBMS로의 이주시에도, 소스 코드 변경 없이 높은 수준의 동시성 격리 무결성을 안전하게 확보하고 확장될 수 있도록 설계가 구성되었습니다. (단, E2E 및 실제 인스턴스 환경 하의 row-lock/deadlock 검증은 현재 Accepted Risk로 수용 상태이며 추후 실 DB 부하/교착 검증 스위트 통과 시 해소됩니다.)
 
