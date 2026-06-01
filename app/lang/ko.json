@@ -257,5 +257,16 @@
     "flash.diplo_reject": "동맹 요청을 거절했는 데스!",
     "flash.diplo_break_fail": "해제할 수 없는 관계인 데스!",
     "flash.diplo_not_mine": "내 외교 관계가 아닌 데스!",
-    "flash.reg_invalid_chars": "이름에 특수문자(<>&\"' 등)는 사용할 수 없는 데스!"
+    "flash.reg_invalid_chars": "이름에 특수문자(<>&\"' 등)는 사용할 수 없는 데스!",
+    "flash.invalid_building": "잘못된 건설 유형인 데스!",
+    "flash.train_no_adults": "훈련시킬 성체실장이 없는 데스!",
+    "flash.birth_no_adults": "출산할 성체실장이 없는 데스!",
+    "flash.gather_negative": "음수는 보낼 수 없는 데스!",
+    "flash.gather_no_units": "최소 1마리는 보내야 하는 데스!",
+    "flash.spy_no_adults": "밀사로 보낼 성체실장이 부족한 데스! (2마리 필요)",
+    "flash.ally_no_spy": "{name}은 동맹인 데스! 동맹에게는 밀사를 보낼 수 없는 데스!",
+    "flash.build_no_material": "자재가 부족한 데스! {cost}🧱 필요한 데스!",
+    "flash.train_no_np": "식량이 부족한 데스! 훈련에 {cost}NP 필요한 데스!",
+    "flash.birth_no_np": "식량이 부족해서 출산할 수 없는 데스! {cost}NP 필요한 데스!",
+    "flash.reg_duplicate": "이미 사용 중인 아이디이거나 공원 이름인 데스!"
 }

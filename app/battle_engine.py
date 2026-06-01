@@ -17,6 +17,8 @@ import random
 import json
 import math
 
+from sqlalchemy import case
+
 from app.models import db, Park, BattleLog, EventLog
 from app.config import GameConfig as GC
 from app import dialogues as DLG
@@ -34,10 +36,22 @@ def execute_battle(attacker, defender, send_guards=None, send_adults=None, boss_
     """
     messages = []
 
+    # [v1.7.0] 비관적 락(Pessimistic Lock): 동시 약탈 Race Condition 방지 (audit_report_14.md [IMP-F037])
+    # [v1.7.0] Deadlock 방지: id 오름차순으로 락 획득 (audit_report_21.md [DEADLOCK-F001])
+    lock_ids = sorted([attacker.id, defender.id])
+    Park.query.filter(Park.id.in_(lock_ids)).with_for_update().all()
+    db.session.refresh(attacker)
+    db.session.refresh(defender)
+
+    # [v1.8.3] 비관적 락 획득 후 양측 멸망 상태 재검증 (Zombie State TOCTOU 방지)
+    if attacker.is_destroyed or defender.is_destroyed:
+        return False, {'konpeito': 0, 'trash': 0, 'material': 0, 'babies': 0, 'children': 0}, \
+            ["이미 멸망한 공원과는 전투를 치를 수 없는 데스!"]
+
     # === 0. 출정 인원 결정 ===
-    # 방어 배치 인원을 제외한 가용 인원
-    avail_guards = max(0, attacker.guard_count - attacker.defending_guards)
-    avail_adults = max(0, attacker.adult_count - attacker.defending_adults)
+    # 방어 배치 인원을 제외한 가용 인원 [v1.7.0] 보유량 초과 방지 (audit_report_8.md [IMP-F017])
+    avail_guards = max(0, min(attacker.guard_count, attacker.guard_count - attacker.defending_guards))
+    avail_adults = max(0, min(attacker.adult_count, attacker.adult_count - attacker.defending_adults))
 
     # 출정 수 결정 (지정값이 없으면 전원, 가용 인원 초과 불가)
     if send_guards is None:
@@ -80,15 +94,35 @@ def execute_battle(attacker, defender, send_guards=None, send_adults=None, boss_
     def_losses = _calc_losses(defender, 1 / power_ratio, is_attacker=False)
 
     # 피해 적용
-    attacker.guard_count = max(0, attacker.guard_count - atk_losses.get('guards', 0))
-    attacker.adult_count = max(0, attacker.adult_count - atk_losses.get('adults', 0))
+    # [v1.7.0] 공격자 피해도 원자적 UPDATE로 처리: refresh 시 덮어쓰기 방지 (audit_report_14.md [IMP-F035])
+    Park.query.filter(Park.id == attacker.id).update({
+        'guard_count': case((Park.guard_count < atk_losses.get('guards', 0), 0), else_=Park.guard_count - atk_losses.get('guards', 0)),
+        'adult_count': case((Park.adult_count < atk_losses.get('adults', 0), 0), else_=Park.adult_count - atk_losses.get('adults', 0)),
+    })
     _apply_losses(defender, def_losses)
+    # [v1.7.0] 공격자/방어자 메모리 동기화: 원자적 UPDATE 반영 후 인구 공간 정확 계산 (audit_report_12.md [IMP-F029])
+    db.session.refresh(attacker)
+    db.session.refresh(defender)
 
     # === 4. 약탈 (공격자 승리 시) ===
     loot = {'konpeito': 0, 'trash': 0, 'material': 0, 'babies': 0, 'children': 0}
 
     if attacker_wins:
         loot = _calculate_loot(defender)
+        # [v1.7.0] 적대 보너스: 적대 관계면 약탈 +20%
+        # 플레이어와 NPC 모두에게 공평하게 적용 (audit_report_31.md [LOGIC-F005])
+        from app.models import Diplomacy
+        is_enemy = Diplomacy.query.filter(
+            ((Diplomacy.park_a_id == attacker.id) & (Diplomacy.park_b_id == defender.id)) |
+            ((Diplomacy.park_a_id == defender.id) & (Diplomacy.park_b_id == attacker.id)),
+            Diplomacy.relation_type == 'enemy',
+            Diplomacy.status == 'active'
+        ).first()
+        if is_enemy:
+            loot['konpeito'] = int(loot['konpeito'] * 1.2)
+            loot['trash'] = int(loot['trash'] * 1.2)
+            loot['material'] = int(loot['material'] * 1.2)
+            messages.append('⚔️ 적대 보너스! 약탈량 +20%!')
         _apply_loot(attacker, defender, loot)
 
         # 승리 대사
@@ -96,16 +130,20 @@ def execute_battle(attacker, defender, send_guards=None, send_adults=None, boss_
         if loot['children'] > 0:
             messages.append(DLG.get_random_dialogue(DLG.BATTLE_WIN_CAPTURED_CHILD))
 
-        # 승리 시 사기 상승
+        # 승리 시 사기 상승 [v1.7.0] 방어자 원자적 UPDATE (audit_report_10.md [IMP-F022])
         attacker.morale = min(100, attacker.morale + 8)
-        defender.morale = max(0, defender.morale - 12)
+        Park.query.filter(Park.id == defender.id).update({
+            'morale': Park.morale - 12,
+        })
     else:
         # 패배 대사
         messages.extend(DLG.get_random_dialogues(DLG.BATTLE_LOSE, 2))
 
-        # 패배 시 사기 변동
+        # 패배 시 사기 변동 [v1.7.0] 방어자 원자적 UPDATE
         attacker.morale = max(0, attacker.morale - 8)
-        defender.morale = min(100, defender.morale + 5)
+        Park.query.filter(Park.id == defender.id).update({
+            'morale': Park.morale + 5,
+        })
 
     # === 5. 보스 피해 판정 ===
     # [v1.5.1] 보스 단독 출전 시 승리해도 소량 HP 감소 (무손실 파밍 Exploit 차단)
@@ -135,12 +173,18 @@ def execute_battle(attacker, defender, send_guards=None, send_adults=None, boss_
             attacker.is_destroyed = True
             messages.append("💀 보스실장이 죽었는 데스... 공원은 멸망한 데스...")
 
-    # 방어자 보스 피해 (대승 시)
+    # 방어자 보스 피해 (대승 시) [v1.7.0] 원자적 UPDATE (audit_report_10.md [IMP-F022])
     if attacker_wins and power_ratio > 2.0:
         boss_dmg = random.randint(5, 15)
-        defender.boss_hp = max(0, defender.boss_hp - boss_dmg)
+        Park.query.filter(Park.id == defender.id).update({
+            'boss_hp': Park.boss_hp - boss_dmg,
+        })
+        # [v1.7.0] 방어자 boss_hp가 0 이하로 떨어지면 즉시 멸망 처리
+        # process_turn의 글로벌 검증에 의존하지 않고 바로 반영 (audit_report_34.md [STATE-F009])
+        db.session.refresh(defender)
         if defender.boss_hp <= 0:
             defender.is_destroyed = True
+            messages.append(f"💀 {defender.name}의 보스실장이 쓰러졌는 데스... 공원 멸망!")
 
     # === 6. 전투 로그 저장 ===
     result_text = 'win' if attacker_wins else 'lose'
@@ -179,7 +223,7 @@ def execute_battle(attacker, defender, send_guards=None, send_adults=None, boss_
                   f"⚔️ {attacker.name}의 침공을 막아냈는 데스!! "
                   + DLG.get_random_dialogue(DLG.BATTLE_DEFEND_WIN))
 
-    db.session.commit()
+    # [v1.7.0] commit은 호출자(attack 라우트 또는 NPC 엔진)에서 처리 (audit_report_10.md [IMP-F022])
     return attacker_wins, loot, messages
 
 
@@ -201,10 +245,10 @@ def _calc_attack_power_selected(send_guards, send_adults, morale, boss_joins):
 
 
 def _calc_defense_power(park):
-    """방어자 전투력 (전체 병력 + 방벽 보너스)"""
-    base = (park.guard_count * GC.POWER_GUARD +
-            park.adult_count * GC.POWER_ADULT +
-            park.child_count * GC.POWER_CHILD)
+    """방어자 전투력 (방어 배치 인원 + 방벽/감시탑/사기 보너스) [v1.7.0]"""
+    # [v1.7.0] spec.md 9.9/12.1 기준: 방어력은 방어 배치 인원(defending_*)만 기준으로 계산
+    base = (park.defending_guards * GC.POWER_GUARD +
+            park.defending_adults * GC.POWER_ADULT)
 
     # 방벽 보너스 (개당 20%)
     wall_bonus = 1.0 + park.walls * 0.2
@@ -213,6 +257,15 @@ def _calc_defense_power(park):
 
     morale_mult = 1.0 + (park.morale - 50) * GC.MORALE_COMBAT_EFFECT / 50
     return max(1, int(base * wall_bonus * tower_bonus * morale_mult))
+
+
+def _stochastic_round(value):
+    """[v1.7.0] 확률적 반올림: 소수부를 확률로 처리하여 int 절사 Exploit 방지 (audit_report_6.md [IMP-F008])"""
+    base = int(value)
+    frac = value - base
+    if frac > 0 and random.random() < frac:
+        base += 1
+    return base
 
 
 def _calc_losses_selected(send_guards, send_adults, power_ratio, is_winner):
@@ -224,22 +277,11 @@ def _calc_losses_selected(send_guards, send_adults, power_ratio, is_winner):
     else:
         loss_rate = random.uniform(0.2, 0.5)     # 패자: 20~50% 손실
 
-    # [v1.6.2] 소수점 불사 부대 Exploit 방지
-    # int() 절사 대신 확률적 올림: fractional part를 확률로 처리
-    # 예: 4 * 0.2 = 0.8 → 80% 확률로 1명 사망, 20% 확률로 0명
-    def stochastic_round(value):
-        """확률적 반올림: 소수부를 확률로 처리하여 int 절사 Exploit 방지"""
-        base = int(value)
-        frac = value - base
-        if frac > 0 and random.random() < frac:
-            base += 1
-        return base
-
     raw_guard_loss = send_guards * loss_rate
     raw_adult_loss = send_adults * loss_rate
 
-    losses['guards'] = min(send_guards, max(0, stochastic_round(raw_guard_loss)))
-    losses['adults'] = min(send_adults, max(0, stochastic_round(raw_adult_loss)))
+    losses['guards'] = min(send_guards, max(0, _stochastic_round(raw_guard_loss)))
+    losses['adults'] = min(send_adults, max(0, _stochastic_round(raw_adult_loss)))
 
     return losses
 
@@ -247,6 +289,7 @@ def _calc_losses_selected(send_guards, send_adults, power_ratio, is_winner):
 def _calc_losses(park, power_ratio, is_attacker):
     """
     전투 피해 계산 (방어자용). power_ratio가 높을수록 피해가 적음.
+    [v1.7.0] stochastic_round 적용 (audit_report_6.md [IMP-F008])
     반환: {'guards': n, 'adults': n, 'children': n}
     """
     losses = {'guards': 0, 'adults': 0, 'children': 0}
@@ -257,18 +300,33 @@ def _calc_losses(park, power_ratio, is_attacker):
     else:
         loss_rate = random.uniform(0.05, 0.2)  # 승자: 5~20% 손실
 
-    losses['guards'] = min(park.guard_count, int(park.guard_count * loss_rate))
-    losses['adults'] = min(park.adult_count, int(park.adult_count * loss_rate))
-    losses['children'] = min(park.child_count, int(park.child_count * loss_rate * 0.5))
+    losses['guards'] = min(park.guard_count, _stochastic_round(park.guard_count * loss_rate))
+    losses['adults'] = min(park.adult_count, _stochastic_round(park.adult_count * loss_rate))
+    losses['children'] = min(park.child_count, _stochastic_round(park.child_count * loss_rate * 0.5))
 
     return losses
 
 
 def _apply_losses(park, losses):
-    """전투 피해를 공원에 적용"""
-    park.guard_count = max(0, park.guard_count - losses.get('guards', 0))
-    park.adult_count = max(0, park.adult_count - losses.get('adults', 0))
-    park.child_count = max(0, park.child_count - losses.get('children', 0))
+    """전투 피해를 공원에 적용 [v1.7.0] 원자적 UPDATE + 음수 방지 case() (audit_report_11.md [IMP-F027])
+    [v1.7.0] 방어 배치 인원 동기화: guard_count/adult_count 차감 시 defending_guards/defending_adults도
+    함께 clamping하여 다중 피격 시 좀비 방어 병력 방지 (audit_report_30.md [STATE-F005])"""
+    Park.query.filter(Park.id == park.id).update({
+        'guard_count': case((Park.guard_count < losses.get('guards', 0), 0), else_=Park.guard_count - losses.get('guards', 0)),
+        'adult_count': case((Park.adult_count < losses.get('adults', 0), 0), else_=Park.adult_count - losses.get('adults', 0)),
+        'child_count': case((Park.child_count < losses.get('children', 0), 0), else_=Park.child_count - losses.get('children', 0)),
+        # [v1.7.0] 방어 배치 인원도 실제 병력 감소에 맞춰 clamping (audit_report_30.md [STATE-F005])
+        'defending_guards': case(
+            (Park.guard_count < losses.get('guards', 0), 0),
+            (Park.defending_guards > Park.guard_count - losses.get('guards', 0), Park.guard_count - losses.get('guards', 0)),
+            else_=Park.defending_guards
+        ),
+        'defending_adults': case(
+            (Park.adult_count < losses.get('adults', 0), 0),
+            (Park.defending_adults > Park.adult_count - losses.get('adults', 0), Park.adult_count - losses.get('adults', 0)),
+            else_=Park.defending_adults
+        ),
+    })
 
 
 def _calculate_loot(defender):
@@ -284,20 +342,30 @@ def _calculate_loot(defender):
 
 
 def _apply_loot(attacker, defender, loot):
-    """약탈 적용: 방어자에서 빼고 공격자에 더함"""
-    # 방어자에서 차감
-    defender.konpeito = max(0, defender.konpeito - loot['konpeito'])
-    defender.trash_food = max(0, defender.trash_food - loot['trash'])
-    defender.material = max(0, defender.material - loot['material'])
-    defender.baby_count = max(0, defender.baby_count - loot['babies'])
-    defender.child_count = max(0, defender.child_count - loot['children'])
+    """약탈 적용: 방어자에서 빼고 공격자에 더함 [v1.7.0] 양측 모두 원자적 UPDATE + case() (audit_report_12.md [IMP-F029])"""
+    # 방어자에서 차감 — 원자적 UPDATE로 동시 공격 Race Condition 방지, case()로 음수 방지
+    Park.query.filter(Park.id == defender.id).update({
+        'konpeito': case((Park.konpeito < loot['konpeito'], 0), else_=Park.konpeito - loot['konpeito']),
+        'trash_food': case((Park.trash_food < loot['trash'], 0), else_=Park.trash_food - loot['trash']),
+        'material': case((Park.material < loot['material'], 0), else_=Park.material - loot['material']),
+        'baby_count': case((Park.baby_count < loot['babies'], 0), else_=Park.baby_count - loot['babies']),
+        'child_count': case((Park.child_count < loot['children'], 0), else_=Park.child_count - loot['children']),
+    })
 
-    # 공격자에게 추가 (상한 적용)
-    attacker.konpeito = min(attacker.konpeito + loot['konpeito'], attacker.konpeito_cap)
-    attacker.trash_food = min(attacker.trash_food + loot['trash'], attacker.trash_food_cap)
-    attacker.material = min(attacker.material + loot['material'], attacker.material_cap)
-    attacker.baby_count += loot['babies']
-    attacker.child_count += loot['children']
+    # [v1.7.0] 공격자 메모리 동기화: 원자적 UPDATE 반영 후 인구 공간 정확 계산 (audit_report_12.md [IMP-F029])
+    db.session.refresh(attacker)
+    space = max(0, attacker.population_cap - attacker.total_population)
+    max_child = attacker.child_count + space
+
+    # 공격자에게 추가 — 원자적 UPDATE + case() 캡핑 (메모리 덮어쓰기 방지)
+    # [v1.7.0] baby_cap hybrid_property 사용: 운치굴 0개일 때도 최소 5마리 보장 (audit_report_32.md [STATE-F007])
+    Park.query.filter(Park.id == attacker.id).update({
+        'konpeito': case((Park.konpeito + loot['konpeito'] > Park.konpeito_cap, Park.konpeito_cap), else_=Park.konpeito + loot['konpeito']),
+        'trash_food': case((Park.trash_food + loot['trash'] > Park.trash_food_cap, Park.trash_food_cap), else_=Park.trash_food + loot['trash']),
+        'material': case((Park.material + loot['material'] > Park.material_cap, Park.material_cap), else_=Park.material + loot['material']),
+        'baby_count': case((Park.baby_count + loot['babies'] > Park.baby_cap, Park.baby_cap), else_=Park.baby_count + loot['babies']),
+        'child_count': case((Park.child_count + loot['children'] > max_child, max_child), else_=Park.child_count + loot['children']),
+    })
 
 
 def _format_battle_log(attacker, defender, attacker_wins, atk_losses, def_losses, loot,

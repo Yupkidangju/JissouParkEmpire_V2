@@ -257,5 +257,16 @@
     "flash.diplo_reject": "同盟要請を拒否したでち！",
     "flash.diplo_break_fail": "解除できない関係でち！",
     "flash.diplo_not_mine": "自分の外交関係ではないでち！",
-    "flash.reg_invalid_chars": "名前に特殊文字(<>&\"'など)は使えないでち！"
+    "flash.reg_invalid_chars": "名前に特殊文字(<>&\"'など)は使えないでち！",
+    "flash.invalid_building": "無効な建設タイプです！",
+    "flash.train_no_adults": "訓練できる成体がいません！",
+    "flash.birth_no_adults": "出産できる成体がいません！",
+    "flash.gather_negative": "負数は派遣できません！",
+    "flash.gather_no_units": "最低1体は派遣してください！",
+    "flash.spy_no_adults": "密使に送る成体が不足しています！（2体必要）",
+    "flash.ally_no_spy": "{name}は同盟です！同盟には密使を送れません！",
+    "flash.build_no_material": "資材が不足しています！{cost}🧱必要です！",
+    "flash.train_no_np": "食料が不足しています！訓練に{cost}NP必要です！",
+    "flash.birth_no_np": "食料が不足しています！出産に{cost}NP必要です！",
+    "flash.reg_duplicate": "そのアイディーまたは公園名は既に使用されています！"
 }

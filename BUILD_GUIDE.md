@@ -23,8 +23,11 @@ source venv/bin/activate
 # 의존성 설치
 pip install -r requirements.txt
 
-# 서버 실행
+# 가상환경(venv) 활성화 상태에서 서버 실행
 python run.py
+
+# 또는 가상환경 외부에서 직접 절대경로로 실행
+venv/bin/python run.py
 ```
 
 3. 브라우저에서 `http://localhost:5000` 접속
@@ -91,6 +94,7 @@ User=pi
 Group=pi
 WorkingDirectory=/opt/jissou-park
 Environment="PATH=/opt/jissou-park/venv/bin"
+EnvironmentFile=/opt/jissou-park/.env
 ExecStart=/opt/jissou-park/venv/bin/gunicorn \
     --workers 2 \
     --bind 127.0.0.1:8000 \
@@ -213,15 +217,28 @@ sudo systemctl restart jissou-park
 
 ---
 
-## 성능 최적화 (라즈베리파이)
+## 성능 최적화 및 DB 이주 지침 (라즈베리파이)
 
 | 항목 | 설정 | 설명 |
 |------|------|------|
-| **Gunicorn Workers** | 2 | RPi는 코어 수가 적으므로 2개 권장 |
-| **SQLite WAL 모드** | 자동 적용 | 동시 읽기 성능 향상 |
+| **Gunicorn Workers** | 2 | RPi는 코어 수가 적고 SQLite 쓰기 경합을 방지하기 위해 2개로 제한(Max 2)하여 sync 모델로 기동합니다. |
+| **SQLite WAL 모드** | PRAGMA 자동 적용 (Engine 리스너) | `PRAGMA journal_mode=WAL` 및 `PRAGMA busy_timeout=5000` 주입으로 쓰기 대기를 최적화합니다. |
 | **정적 파일** | Nginx 직접 서빙 | Gunicorn 부하 감소 |
 | **턴 간격** | 600초 (10분) | CPU 부하 분산 |
 | **DB 백업** | `cp instance/game.db backup/` | 주기적 백업 권장 |
+
+### ⚠️ SQLite + Gunicorn 다중 워커 (Multi-Worker) 제한 지원 및 PostgreSQL 전환 기준 (Accepted Risk)
+기본 설정인 SQLite 파일 DB를 다중 워커(Gunicorn) 환경에서 운영할 때, 아키텍처 특성상 다중 프로세스 동시 쓰기 레이스로 인해 `Database Locked` (busy_timeout 초과) 오류가 발생할 수 있습니다.
+본 가이드에서는 다음 조건 하에 이 구성을 제한적 수용 위험(Accepted Risk, 책임자: Eunho Lim)으로 정의하며, 한계를 초과할 경우 **즉시 PostgreSQL로의 이주**를 진행해야 합니다.
+
+1. **Gunicorn 운영 규격**: Gunicorn workers는 최대 2개로 제한하고, `--threads` 옵션을 배제한 단일 스레드 sync worker 모델을 사용하십시오.
+2. **PostgreSQL 전환 트리거**:
+   - 일일 동시 활성 사용자(DAU)가 100명을 초과하는 경우.
+   - 피크 시간대 초당 평균 DB 쓰기 트랜잭션이 10회 이상 발생하는 경우.
+   - `Database Locked`로 인한 서비스 일시 실패가 주 3회 이상 시스템 저널 로그에 감지되는 경우.
+3. **이주 방법 요약**:
+   - PostgreSQL 데몬 설치 및 데이터베이스 생성.
+   - `.env`에 `DATABASE_URL=postgresql://user:password@localhost:5432/jissou_db` 연결 문자열 구성. (SQLAlchemy가 이주 설계를 통해 `with_for_update()` canonical row-lock을 자동으로 가동하여 교착 상태가 예방된 안전한 동시 처리를 수행합니다.)
 
 ---
 

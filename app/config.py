@@ -2,24 +2,63 @@
 """
 실장석 공원 제국 - 게임 설정 (config.py)
 [v0.1.0] 초기 설정. spec.md 기반 밸런스 상수 정의.
+[v1.8.9] python-dotenv 통합 및 안전 실패(Fail-safe) 설정 보안 강화 (audit_report_62.md [SEC-F001])
+- SECRET_KEY 및 FLASK_SECRET_KEY 두 환경변수 모두 유연하게 지원
+- 프로덕션 배포(production 환경 또는 DEBUG=False 환경) 시 시크릿 키 누설을 방지하도록 락다운: 미지정 시 즉시 ValueError를 선언하며 가동 중단(Fail-Closed)
+- 개발 DEBUG 환경에서만 임시 세션용 난수 fallback(os.urandom) 적용
+- DEBUG 환경변수 기본값을 False로 완화하여 보안 누출 방지 (안전 실패 기조 준수)
 
 모든 게임 밸런스 수치를 이 파일에서 중앙 관리한다.
 수치 변경 시 이 파일만 수정하면 게임 전체에 반영된다.
 """
 import os
+from pathlib import Path
+from dotenv import load_dotenv
+
+# [v1.8.9] 앱 컨텍스트 초기 진입 지점(config.py)에서 명시적으로 로컬 .env 로드 전개
+env_path = Path(__file__).resolve().parent.parent / '.env'
+if env_path.exists():
+    load_dotenv(dotenv_path=env_path)
 
 
 class Config:
     """Flask 기본 설정"""
-    # Flask 시크릿 키 (세션 암호화용)
-    SECRET_KEY = os.environ.get('FLASK_SECRET_KEY', 'jissou-park-secret-desu-2026')
+    # [v1.8.9] 안전 실패(Fail-safe) 디버그 기본값 설정:
+    # 환경변수에 명시적으로 'true' 또는 '1'이 들어오지 않는 한, 기본적으로 무조건 False(디버그 오프) 상태로 시작함.
+    # 이를 통해 프로덕션 배포 상태에서 디버그 모드가 실수로 유지되어 /debug 라우트가 노출되는 위협을 완벽히 소멸시킴.
+    DEBUG = os.environ.get('DEBUG', 'false').lower() in ('true', '1', 'yes')
 
-    # SQLite 데이터베이스 경로
-    SQLALCHEMY_DATABASE_URI = 'sqlite:///game.db'
+    # [v1.8.9] 유연한 환경변수 정합성 확보 (SECRET_KEY와 FLASK_SECRET_KEY 둘 다 바인딩 지원)
+    _secret = os.environ.get('SECRET_KEY') or os.environ.get('FLASK_SECRET_KEY')
+
+    # [v1.8.9] 프로덕션 환경 판별을 더욱 강건하게 구성합니다.
+    # FLASK_ENV가 'production'이거나 ENV_TYPE이 'production'인 경우,
+    # DEBUG=true 설정이나 SECRET_KEY 누락 상태에서의 임시 난수 키 fallback을 원천 차단합니다.
+    _flask_env = os.environ.get('FLASK_ENV', '').lower()
+    _env_type = os.environ.get('ENV_TYPE', '').lower()
+    _is_explicit_production = (_flask_env == 'production' or _env_type == 'production')
+
+    # 만약 명시적인 프로덕션 모드인데 디버그가 켜져 있는 오설정이 감지될 경우,
+    # 보안 위험(디버그 콘솔 노출 및 턴 백도어)을 차단하기 위해 DEBUG 모드를 강제로 비활성화(False) 처리합니다.
+    if _is_explicit_production:
+        DEBUG = False
+
+    # [v1.8.9] 프로덕션 안전 실패(Fail-Closed) 정책 반영:
+    # 명시적 프로덕션 환경이거나, 일반적인 비-디버그 환경(DEBUG=False)인 경우 시크릿 키가 누락되었을 때
+    # Gunicorn 멀티 프로세스 워커 간의 세션 불일치 및 인증 경계 모호성을 차단하기 위해 즉각 기동 실패(ValueError)를 선언합니다.
+    if not _secret:
+        if _is_explicit_production or not DEBUG:
+            raise ValueError(
+                "CRITICAL SECURITY ERROR: SECRET_KEY (또는 FLASK_SECRET_KEY) 환경변수가 프로덕션 환경에서 누락되었습니다! "
+                "세션 위조 및 다중 워커 세션 불일치 방지를 위해 가동을 중단하는 안전 실패(Fail-Closed) 상태로 진입합니다."
+            )
+        _secret = os.urandom(24).hex()
+
+    SECRET_KEY = _secret
+
+    # SQLite 및 PostgreSQL 데이터베이스 경로 (환경변수 주입 호환성 확보 [v1.8.9])
+    SQLALCHEMY_DATABASE_URI = os.environ.get('SQLALCHEMY_DATABASE_URI') or os.environ.get('DATABASE_URL') or 'sqlite:///game.db'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
-
-    # 디버그 모드
-    DEBUG = os.environ.get('DEBUG', 'true').lower() == 'true'
 
 
 class GameConfig:
