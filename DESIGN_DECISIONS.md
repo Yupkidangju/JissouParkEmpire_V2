@@ -181,7 +181,7 @@
 | float 그대로 저장 | 모델 필드가 int → DB 오류 |
 
 ### 결과
-- 소수점 Exploit 완전 차단.
+- 소수점 Exploit을 설계 레벨에서 고도 차단.
 - 기대값은 동일하지만 분산이 추가되어 전략의 불확실성 증가.
 
 ---
@@ -524,7 +524,7 @@
 
 ### 결과
 - NPC 턴 동기화 시 발생하는 동시성 충돌 및 Auto-Flush에 의한 Lost Update 결함을 구조적으로 해결함.
-- 예외 발생 시에도 비관적 락 유실 및 스탬피드 버그 없이 안전하게 트랜잭션을 격리하고 자가 복구할 수 있는 강력한 무결성을 100% 확보함.
+- 예외 발생 시에도 비관적 락 유실 및 스탬피드 버그 없이 안전하게 트랜잭션을 격리하고 자가 복구할 수 있는 강력한 무결성을 설계 레벨에서 고도 확보함 (PostgreSQL/MySQL 등 외부 RDBMS 실검증 전까지 Accepted Risk 수용 및 tests/test_regression.py 범위 내 검증).
 
 ---
 
@@ -580,7 +580,7 @@
 | AP 감산을 원자적 벌크 UPDATE 문으로만 수행 | AP 감산은 가능하지만, 행동 시작 전 플레이어의 실제 AP 부족 여부를 검증하는 세션 런타임의 가상 객체 상태(`park.action_points`)가 Stale 상태로 잔존하여 후속 라우트 내부 로직에서 판단 오염을 방출할 수 있음 |
 
 ### 결과
-- 턴 진행 및 NPC 동기 턴 처리라는 장시간의 무락(Lock-free Gap) 런타임 간극 속에서도 concurrent 다중 요청의 AP 소모 정합성을 100% 무결하게 보호하고 AP 복제 Exploit을 고도로 차단함.
+- 턴 진행 및 NPC 동기 턴 처리라는 장시간의 무락(Lock-free Gap) 런타임 간극 속에서도 concurrent 다중 요청의 AP 소모 정합성을 설계적으로 고도 보호하고 AP 복제 Exploit을 높은 수준으로 차단함 (회귀 테스트 범위 내 검증).
 - 2차 비관적 락 및 refresh 동기화 패턴을 통해 성능 희생(락 시간 최소화)과 데이터 무결성을 동시 달성함.
 
 ---
@@ -602,7 +602,7 @@
 | 롤백 가드 생략 | nested 롤백 실패 시 SQLAlchemy 세션이 고도로 FAILED 상태로 고정되어 후속 유저 요청에 지속적으로 PendingRollbackError를 내뿜음 |
 
 ### 결과
-- `ResourceClosedError`가 완치되고 NPC AI가 턴 롤백 시 부모 트랜잭션을 안전하게 복구하여 턴 무한 반복 및 락 오동작을 영구 차단했습니다.
+- `ResourceClosedError`가 고도 예방되고 NPC AI가 턴 롤백 시 부모 트랜잭션을 안전하게 복구하여 턴 무한 반복 및 락 오동작을 설계적으로 강력히 방지했습니다.
 
 ---
 
@@ -650,7 +650,7 @@
 - `process_npc_turn()` 최상단에서 대상 NPC 공원에 무조건적으로 비관적 락(`with_for_update().first()`)을 선점 획득하고 트랜잭션이 고도로 커밋될 때까지 들고 있었습니다.
 - NPC가 공격 성향을 띠고 `_npc_attack`을 통해 다른 공원을 공격하려 하면 `execute_battle()`이 기동되어 데드락 방지용 ID 오름차순(Canonical Ordering) 락킹(`Park.query.filter(Park.id.in_(lock_ids)).with_for_update().all()`)을 시도합니다.
 - 이때 공격자(NPC)의 ID가 방어자(Player)의 ID보다 크면(`Player.id < NPC.id`), 정렬 순서는 `[Player, NPC]`가 되지만 NPC 스레드는 **이미 NPC.id 락을 쥔 채**로 Player 락을 대기하게 됩니다. (즉 `NPC -> Player` 순서로 대기)
-- 동시에 Player가 NPC를 공격하는 등의 트랜잭션이 작동하여 `Player -> NPC` 순서로 정렬 락을 얻으려 하면, 서로가 서로의 락 해제를 영구히 기다리는 **락 순서 역전 교착 상태(Lock Order Inversion Deadlock) [DEADLOCK-F005]**가 발생하여 DB 커넥션 풀이 완전 고사하고 서비스 장애가 유발되었습니다.
+- 동시에 Player가 NPC를 공격하는 등의 트랜잭션이 작동하여 `Player -> NPC` 순서로 정렬 락을 얻으려 하면, 서로가 서로의 락 해제를 영구히 기다리는 **락 순서 역전 교착 상태(Lock Order Inversion Deadlock) [DEADLOCK-F005]**가 발생하여 DB 커넥션 풀이 고사하고 서비스 장애가 유발되었습니다.
 
 ### 결정
 - `_sync_npc_turns()` 레벨에서 NPC 기본 턴 처리(`process_turn`) 완료 즉시 명시적인 `db.session.commit()`을 수행하여 선점 락을 고도로 해제(소멸)한 뒤, 독립된 트랜잭션 경계 하에 `process_npc_turn()`을 구동하는 **2단계 트랜잭션 경계 분리 구조**를 채택했습니다. 또한 `process_npc_turn()` 최상단에서의 무조건적 락 선점을 배제하여, 전투(`execute_battle()`) 등 개별 행동 단위로만 필요한 락을 안전한 ID 오름차순(Canonical Ordering) 순서대로 획득하도록 통제를 완화하였습니다.
@@ -662,7 +662,7 @@
 | execute_battle 실행 전 락 전체 임시 해제 후 재획득 | SQLAlchemy 세션 및 트랜잭션 범위 상 중간 락 강제 해제가 불완전하며, 복잡한 비즈니스 롤백 로직의 일관성을 크게 해쳐 기각함 |
 
 ### 결과
-- 락 선점으로 인한 락 순서 역전 데드락 결함`[DEADLOCK-F005]`이 완전 종식되었으며, NPC 침공 시의 DB 커넥션 고갈 위협을 고도로 소멸시키고 안정적인 2단계 트랜잭션 롤백 무결성을 확보했습니다.
+- 락 선점으로 인한 락 순서 역전 데드락 결함`[DEADLOCK-F005]`을 고도 예방하였으며, NPC 침공 시의 DB 커넥션 고갈 위협을 고도로 소멸시키고 안정적인 2단계 트랜잭션 롤백 무결성을 확보했습니다.
 
 ---
 

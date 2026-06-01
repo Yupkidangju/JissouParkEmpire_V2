@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 실장석 공원 제국 - 회귀 테스트 코드 (test_regression.py)
-[v1.8.9] Critical 동시성, 세이브포인트 플러시, 데드락 완치 검증용 회귀 테스트 (audit_report_63.md [DBG-F002] 및 audit_report_65.md [DBG-F003]/[DBG-F002])
+[v1.8.9] Critical 동시성, 세이브포인트 플러시, 데드락 고도 예방 검증용 회귀 테스트 (audit_report_63.md [DBG-F002] 및 audit_report_65.md [DBG-F003]/[DBG-F002])
 - Node.js 기반 실질적 프론트엔드 XSS 이스케이프 검증 및 2중 SQLAlchemy 세션 기반 SQLite Lost Update 동시성 경쟁 검증 포함.
 - 모든 주석은 엄격하게 한국어로만 기술됩니다.
 """
@@ -91,7 +91,7 @@ def test_audit_report_59_spy_overcrowding_lock(app):
         db.session.commit()
 
         # 실제 밀사 임무 및 overcrowding 처리 함수 직접 기동
-        # 내부적으로 2차 비관적 락과 db.session.refresh가 완벽하게 맞물려 에러 없이
+        # 내부적으로 2차 비관적 락과 db.session.refresh가 설계대로 정밀하게 맞물려 에러 없이
         # 최신 정보를 기반으로 정상 정화(adult_count 정화)를 이행하는지 검증합니다.
         _process_spy_missions(player_park)
         db.session.commit()
@@ -104,9 +104,9 @@ def test_audit_report_59_spy_overcrowding_lock(app):
 def test_audit_report_61_npc_attack_lock_order(app):
     """
     [audit_report_61.md 및 62.md/63.md 회귀 검증]
-    _sync_npc_turns() 진행 중 process_turn() 완료 직후 commit을 집행하여 선점 락을 완전히 해제하고,
+    _sync_npc_turns() 진행 중 process_turn() 완료 직후 commit을 집행하여 선점 락을 고도로 해제하고,
     그 다음 깨끗하게 락이 비워진 상태에서 process_npc_turn()의 공격 경로(execute_battle)에 진입하여
-    락 순서 역전 교착 상태(DEADLOCK-F005)를 완치 및 차단하는 호출 흐름을 검증합니다.
+    락 순서 역전 교착 상태(DEADLOCK-F005)를 고도 예방하는 호출 흐름을 검증합니다.
     또한, execute_battle()이 실질적으로 결투를 완수하여 AP 차감 및 전투 로그 생성 등 상태 변경을 달성했는지 결정적으로 검증합니다.
     """
     from app.models import BattleLog
@@ -408,7 +408,7 @@ def test_static_js_inner_html_xss_protection():
         interpolations = re.findall(r'\$\{(.*?)\}', template)
         for item in interpolations:
             item_stripped = item.strip()
-            # [v1.9.0] 단순 문자열 포함 여부 매칭의 사각지대(예: escapeHtml 누설 mixed expression)를 완치하기 위해
+            # [v1.9.0] 단순 문자열 포함 여부 매칭의 사각지대(예: escapeHtml 누설 mixed expression)를 고도 예방하기 위해
             # 전체 표현식이 단일 safe token인지 여부를 판단하는 구조로 스캔 로직을 고도화합니다.
             is_safe = False
             if "escapeHtml(" in item_stripped or "parseInt(" in item_stripped or "parseFloat(" in item_stripped:

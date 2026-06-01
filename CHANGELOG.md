@@ -42,7 +42,7 @@
 
 ### 수정됨 (Fixed)
 - **NPC 턴 동기화 루프 내 DB 커밋으로 인한 비관적 락 유실 및 Lost Update 차단**: `_sync_npc_turns`에서 모든 NPC를 일괄 `with_for_update().all()`로 가져온 뒤 루프 내에서 `commit()`하는 기존 구조로 인해, 첫 번째 NPC 커밋 시 나머지 NPC들의 락이 조기 해제되어 타 스레드가 개입해 턴을 중복 수행하는 결함을 수정함. 루프 외부에서는 ID 목록만 추출하고, 루프 내부에서 **개별 트랜잭션 단위로 각 NPC 공원을 비관적 락 조회(`with_for_update()`) 및 commit**하도록 트랜잭션 경계를 고도로 분리 격리하여 Lost Update를 차단함. (audit_report_54.md [STATE-F028])
-- **NPC AI 행동 내부 예외 발생 시 비관적 락 유실 및 무한 턴(Stampede) 방어**: NPC의 개별 행동 시도 중 예외 발생 시 전체 트랜잭션을 `rollback()`하여 진입 시 획득했던 공원의 비관적 락까지 유실되고 턴 충전 수치가 소실되던 아키텍처적 결함을 해결함. 행동 호출 부에 **Nested Transaction (Savepoint, `begin_nested()`)** 격리망을 구축하여 예외 발생 시 오직 실패한 그 행동의 상태만 롤백하고 부모 트랜잭션과 비관적 락, 그리고 이전 단계의 턴 정보(`turn_count`)를 유실 없이 완전 보존하도록 보강함. (audit_report_54.md [TRANSACTION-F005])
+- **NPC AI 행동 내부 예외 발생 시 비관적 락 유실 및 무한 턴(Stampede) 방어**: NPC의 개별 행동 시도 중 예외 발생 시 전체 트랜잭션을 `rollback()`하여 진입 시 획득했던 공원의 비관적 락까지 유실되고 턴 충전 수치가 소실되던 아키텍처적 결함을 해결함. 행동 호출 부에 **Nested Transaction (Savepoint, `begin_nested()`)** 격리망을 구축하여 예외 발생 시 오직 실패한 그 행동의 상태만 롤백하고 부모 트랜잭션과 비관적 락, 그리고 이전 단계의 턴 정보(`turn_count`)를 유실 없이 고도 보존하도록 보강함. (audit_report_54.md [TRANSACTION-F005])
 - **밀사 사보타주 피해량 산정 TOCTOU 방지 및 2-Way Lock 격리**: 밀사가 적 공원에 사보타주를 기동하여 자원/유닛 피해를 유발할 때, 피해 산정 시점과 실제 쿼리 실행 간의 격차로 인해 로그 상의 소실량과 실제 반영 데이터가 불일치하는 결함을 해결함. 임무 성공 여부 판단 및 피해량 연산 시작 전 두 공원에 대해 ID 정렬 2중 비관적 락을 먼저 획득하도록 보완하여 무결성을 강제함. (audit_report_54.md [LOGIC-F021])
 
 ## [1.8.5] - 2026-05-31
@@ -60,7 +60,7 @@
 
 ### 수정됨 (Fixed)
 - **좀비 상태 행동 차단 및 턴 경과 멸망 유효성 재검사**: `consume_turn()`에서 AP가 부족하여 `process_turn()`을 실행한 뒤 굶주림 등으로 보스 HP가 0이 되어 공원이 멸망(`is_destroyed=True`)할 경우, 즉시 행동 처리를 중단하고 실패 리턴하도록 검증 가드를 신설하여 멸망한 상태에서 건설/침공 등 좀비 액션(Zombie Action)을 취할 수 있던 결함을 차단함 (audit_report_50.md [STATE-F024])
-- **비관적 락 획득 후 TOCTOU 멸망 상태 재검증**: 교역 수락(`trade_accept`) 및 전투 엔진(`execute_battle`)에서 `with_for_update()` 비관적 락을 획득하고 객체를 리프레시한 직후, 락 대기 시간 동안 상대방 또는 자아가 멸망했는지(`is_destroyed` 여부)를 재검사하여 교역을 즉각 취소(만료) 또는 전투를 중단 롤백하도록 설계하여, 멸망한 좀비 공원과 자원 거래를 하거나 침공하는 TOCTOU 논리 무결성 붕괴 취약점을 완벽 해결함.
+- **비관적 락 획득 후 TOCTOU 멸망 상태 재검증**: 교역 수락(`trade_accept`) 및 전투 엔진(`execute_battle`)에서 `with_for_update()` 비관적 락을 획득하고 객체를 리프레시한 직후, 락 대기 시간 동안 상대방 또는 자아가 멸망했는지(`is_destroyed` 여부)를 재검사하여 교역을 즉각 취소(만료) 또는 전투를 중단 롤백하도록 설계하여, 멸망한 좀비 공원과 자원 거래를 하거나 침공하는 TOCTOU 논리 무결성 붕괴 취약점을 고도 방지함.
 
 ## [1.8.2] - 2026-05-31
 
@@ -71,7 +71,7 @@
 ## [1.8.1] - 2026-05-31
 
 ### 수정됨 (Fixed)
-- **프로세스 장벽 동시성 제어 확보 및 Gunicorn 락 우회 차단**: 다중 워커 프로세스 환경에서 스레드 락(`threading.Lock()`)의 무력함을 극복하고, 교역 생성(`trade_create`) 및 NPC 동기 턴 진행(`_sync_npc_turns`) 시에 데이터베이스 레벨의 **비관적 락(`with_for_update()`)** 및 일관된 id 정렬(데드락 방지)을 획득하도록 개편하여 교역 등록 제한 우회 및 동일 NPC의 턴 중복 처리(NPC Stampede) 밸런스 붕괴를 완벽하게 차단함 (audit_report_48.md [LOGIC-F019])
+- **프로세스 장벽 동시성 제어 확보 및 Gunicorn 락 우회 차단**: 다중 워커 프로세스 환경에서 스레드 락(`threading.Lock()`)의 무력함을 극복하고, 교역 생성(`trade_create`) 및 NPC 동기 턴 진행(`_sync_npc_turns`) 시에 데이터베이스 레벨의 **비관적 락(`with_for_update()`)** 및 일관된 id 정렬(데드락 방지)을 획득하도록 개편하여 교역 등록 제한 우회 및 동일 NPC의 턴 중복 처리(NPC Stampede) 밸런스 붕괴를 고도 예방함 (audit_report_48.md [LOGIC-F019])
 - **NPC 턴 트랜잭션 원자화 및 Lost Update 수정**: NPC의 소규모 자연 성장(`_npc_passive_growth`)을 `case()` 기반의 단일 원자적 `UPDATE`로 전환하여 `autoflush` 발동 시 메모리 상의 구버전 데이터로 플레이어의 공격/약탈 결과를 덮어쓰는(Lost Update) 문제를 해결하였고, 범용 엔진 함수(`action_gather`, `action_birth`, `action_build`, `action_train`, `action_cull`)에 `commit=True` 매개변수를 도입하여 NPC 행동 시 중간 커밋을 억제하고 단일 NPC 턴 전체가 고도로 원자적인 트랜잭션 안에서 수행 및 롤백될 수 있도록 구조를 개편함 (audit_report_48.md [STATE-F022])
 
 ## [1.8.0] - 2026-05-31
@@ -184,7 +184,7 @@
 ## [1.4.0] - 2026-02-17
 
 ### 추가됨 (Added)
-- **UI 전면 i18n 적용**: HTML 템플릿 + Python flash 메시지 완전 국제화
+- **UI 전면 i18n 적용**: HTML 템플릿 + Python flash 메시지 다국어화 고도 적용
   - `register.html`: NPC 대사, 헤더, 초기자원 안내 → `{{ t('key') }}`
   - `login.html`: 태그라인, 제목, 헤더 → `{{ t('key') }}`
   - `gameover.html`: 게임오버 대사, 스탯 라벨, 멸망 안내 → `{{ t('key') }}`

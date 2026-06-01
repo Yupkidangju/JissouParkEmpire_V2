@@ -339,11 +339,11 @@ MIT License
 - **Q: 在 NPC 輪次同步過程中，中間提交（Commit）是否會導致鎖遺失或產生 Lost Update？**
   - **A:** [v1.8.6] 我們解決了在循環外部一次性鎖定所有 NPC、並在循環內部執行提交時所產生的過早釋放鎖的結構性缺陷。現在，我們在循環外部僅查詢 NPC ID 列表，並在循環內部採用**獨立隔離的事務**對每個 NPC 進行悲觀鎖定（`with_for_update()`）。此外，若 NPC 的某項行動失敗拋出異常，系統將啟動**嵌套事務（Nested Transaction / Savepoint, `begin_nested()`）**僅回滾該失敗行動，從而保護整體的悲觀鎖並避免輪次計數回滾（防止 Stampede 發生）。密使破壞行動也套用了 2 向鎖以高度預防 TOCTOU 計算誤差。
 - **Q: 在拒絕交易時，惡意用戶是否能篡改交易 ID 以強制拒絕他人的私密交易（IDOR）？此外，已滅亡用戶的交易（Zombie Trades）是否會持續顯示在市場中？**
-  - **A:** [v1.8.7] 我們在交易拒絕（`trade_reject`）API 的原子化 UPDATE 條件中新增了 `receiver_id == park.id` 防護條件，強制要求只有收到提議的本人才能拒絕交易，從根本上杜絕了 IDOR 權限越權漏洞。同時，為防止已滅亡用戶的交易提議持續滯留在市場中（殭屍交易），我們修改了 `trade_market()` 查詢，在 SQL 階段 JOIN `Park` 模型，僅動態篩選出發送方依然生存（`is_destroyed == False`）的交易提議進行顯示。
+  - **A:** [v1.8.7] 我们在交易拒绝（`trade_reject`）API 的原子化 UPDATE 条件中新增了 `receiver_id == park.id` 防护条件，强制要求只有收到提议的本人才能拒绝交易，有效防范了 IDOR 权限越权漏洞。同时，为防止已灭亡用户的交易提议持续滞留在 market 中（殭屍交易），我们修改了 `trade_market()` 查詢，在 SQL 階段 JOIN `Park` 模型，僅動態篩選出發送方依然生存（`is_destroyed == False`）的交易提議進行顯示。
 - **Q: 在慢速路徑（消耗輪次與 NPC 輪次同步）執行期間，若其他非同步請求扣除 AP，是否會因過期記憶體覆寫（Lost Update）而導致 AP 複製（免費使用）？**
   - **A:** [v1.8.8] 我們已高度緩解了 AP 複製（Lost Update）缺陷。即使在慢速路徑的無鎖同步間隙期間，併發的快速路徑請求成功扣成了 AP，慢速路徑的末端也會**重新取得玩家公園的悲觀鎖並強制執行 `refresh` 資料刷新**，隨後才進行最終的 AP 減算，從而確保了資料的高度一致性與原子性。 (audit_report_56.md [STATE-F029])
 - **Q: 在 NPC 輪次進行中發生戰鬥時，會因 `ResourceClosedError` 等錯誤導致輪次同步中斷或陷入無限循環嗎？另外，行動失敗時退還的 AP 會流失嗎？或是密使歸還後的過密處理時會因 Lost Update 造成資源消失或複製嗎？**
-  - **A:** [v1.8.9] 已高度緩解。NPC 戰鬥內部的 `commit()` 已被替換為 `flush()` 以保護嵌套的 Savepoint，並採用雙重回滾異常防禦。退還的 AP 在路由異常區段內會立即執行顯式的 `db.session.commit()`，防範回滾流失。最後，在 `_process_spy_missions` 的過密處理前，系統會對玩家公園再次獲取 `with_for_update()` 悲觀鎖並執行 `refresh`，高度預防併發請求對資料的覆蓋（Lost Update）。
+  - **A:** [v1.8.9] 已高度缓解。NPC 战斗内部的 `commit()` 已被替换为 `flush()` 以保护嵌套的 Savepoint，并采用双重回滚异常防御。退还的 AP 在路由异常区段内会立即执行显式的 `db.session.commit()`，防止回滚流失。最后，在 `_process_spy_missions` 的过密处理前，系统会对玩家公园再次获取 `with_for_update()` 悲观锁并执行 `refresh`，高度预防并发请求对数据的覆盖（Lost Update）。
 - **Q: 當 NPC 攻擊玩家或其他公園時，是否會因鎖定取得順序衝突而導致死鎖（Deadlock）並耗盡 DB 連線？**
   - **A:** [v1.8.9] 已高度防範死鎖漏洞 `[DEADLOCK-F005]`。我們已永久移除了在 `process_npc_turn()` 開始時無條件先行取得的悲觀鎖（`with_for_update()`），改為僅進行單純刷新（`refresh`），同時在上位輪次同步調度器 `_sync_npc_turns()` 中，NPC基本輪次處理（`process_turn`）完成後立即強制執行 `db.session.commit()` 以完全釋放先行鎖，隨後將 `process_npc_turn()` 作為獨立事務啟動，全方位採用了**兩階段事務邊界分離結構**。因此，當 NPC 發動攻擊時，兩個公園的鎖僅會在 `execute_battle()` 內部依據 Canonical Ordering（按 ID 升序排序）安全地同時取得。這高度預防了因相互鎖等待衝突導致的死鎖及資料庫連線池枯竭的問題。
 
@@ -356,21 +356,21 @@ MIT License
   - **A:** [v1.8.1] 已全面将线程锁（`threading.Lock`）替换为数据库层级的悲观锁（`with_for_update()`）并结合 `turn_count` 同步防护，保证超越进程边界的完整事务序列化。
 - **Q: 用户攻击 NPC 时是否存在资源被覆盖（Lost Update） 或 NPC 轮次例外时产生资源无效复制的漏洞？**
   - **A:** [v1.8.1] 已将 NPC 自然成长转换为单一原子化 SQL `UPDATE` 以防止 `autoflush` 覆盖，确保整个 NPC 轮次在单一原子化事务内安全执行与回滚。
-- **Q: 行动执行过程中若因资源不足 or 验证失败而中断，先前扣除的 AP（行动点数）会消失吗？**
-  - **A:** [v1.8.2] 当行动失败时，系统会自动启动补偿事务（`game_engine.refund_ap`），将已由 `consume_turn` 先行扣除的 AP 安全地退还给玩家，彻底杜绝 AP 资源永久流失（AP Leakage）的问题。
+- **Q: 行动执行过程中若因资源不足或验证失败而中断，先前扣除的 AP（行动点数）会消失吗？**
+  - **A:** [v1.8.2] 当行动失败时，系统会自动启动补偿事务（`game_engine.refund_ap`），将已由 `consume_turn` 先行扣除的 AP 安全地退还给玩家，有效防范 AP 资源永久流失（AP Leakage）的问题。
 - **Q: 随着轮次推进而导致公园已灭亡时，还能再执行行动吗？是否会与已灭亡的公园发生交易或战斗？**
-  - **A:** [v1.8.3] 若因 `consume_turn` 中的轮次消耗导致公园灭亡，行动会被立即中止并拦截。此外，交易接受和战斗在取得悲观锁后，亦会即时重新验证双方的灭亡状态，从而完全杜绝僵尸行动（Zombie Action）与 TOCTOU 漏洞。
-- **Q: 当对方公园被删除（重新开始）时，我所提议的交易资源 or 派遣的密使（成体实装）会永久消失吗？**
-  - **A:** [v1.8.4] 通过引入数据库层级的 `before_delete` 事件监听器，当对方执行 `/restart` 导致交易 or 密使被级联删除（Cascade Delete）时，系统会自动将待处理的托管资源及执行中的密使返还给发送方公园（适用容量上限限制），从根本上杜绝了资源流失（Leakage）问题。
-- **Q: 当两个公园同时向对方发送外交请求（结盟/敌对）时，是否会产生重复的关系 or 矛盾的状态（既是盟友又是敌人）？**
+  - **A:** [v1.8.3] 若因 `consume_turn` 中的轮次消耗导致公园灭亡，行动会被立即中止并拦截。此外，交易接受和战斗在取得悲观锁后，亦会即时重新验证双方的灭亡状态，从而高度防范僵尸行动（Zombie Action）与 TOCTOU 漏洞。
+- **Q: 当对方公园被删除（重新开始）时，我所提议的交易资源或派遣的密使（成体实装）会永久消失吗？**
+  - **A:** [v1.8.4] 通过引入数据库层级的 `before_delete` 事件监听器，当对方执行 `/restart` 导致交易或密使被级联删除（Cascade Delete）时，系统会自动将待处理的托管资源及执行中的密使返还给发送方公园（适用容量上限限制），有效防范了资源流失（Leakage）问题。
+- **Q: 当两个公园同时向对方发送外交请求（结盟/敌对）时，是否会产生重复的关系 或矛盾的状态（既是盟友又是敌人）？**
   - **A:** [v1.8.5] 通过在储存外交关系时强制执行 Canonical Ordering（`park_a_id < park_b_id`）并引入 `initiator_id` 字段，数据库的 UniqueConstraint 能高度预防重复关系的生成。此外，我们采用按 ID 排序的 2 向悲观锁以高度预防死锁，并使用批量更新（`update()`）一并解除两公园间所有 active/pending 的重复关系，确保不会出现矛盾状态或解除遗漏。
-- **Q: 在 NPC 轮次同步过程中，中间提交（Commit）是否会导致锁遗失 or 产生 Lost Update？**
+- **Q: 在 NPC 轮次同步过程中，中间提交（Commit）是否会导致锁遗失或产生 Lost Update？**
   - **A:** [v1.8.6] 我们解决了在循环外部一次性锁定所有 NPC、并在循环内部执行提交时所产生的过早释放锁的结构性缺陷。现在，我们在循环外部仅查询 NPC ID 列表，并在循环内部采用**独立隔离的事务**对每个 NPC 进行悲观锁定（`with_for_update()`）。此外，若 NPC 的某项行动失败抛出异常，系统将启动**嵌套事务（Nested Transaction / Savepoint, `begin_nested()`）**仅回滚该失败行动，从而保护整体的悲观锁并避免轮次计数回滚（防止 Stampede 发生）。密使破坏行动也套用了 2 向锁以高度预防 TOCTOU 计算误差。
 - **Q: 在拒绝交易时，恶意用户是否能篡改交易 ID 以强制拒绝他人的私密交易（IDOR）？此外，已灭亡用户的交易（Zombie Trades）是否会持续显示在市场中？**
-  - **A:** [v1.8.7] 我们在交易拒绝（`trade_reject`）API 的原子化 UPDATE 条件中新增了 `receiver_id == park.id` 防护条件，强制要求只有收到提议的本人才能拒绝交易，从根本上杜绝了 IDOR 权限越权漏洞。同时，为防止已灭亡用户的交易提议持续滞留在市场中（僵尸交易），我们修改了 `trade_market()` 查询，在 SQL 阶段 JOIN `Park` 模型，仅动态筛选出发送方依然生存（`is_destroyed == False`）的交易提议进行显示。
+  - **A:** [v1.8.7] 我们在交易拒绝（`trade_reject`）API 的原子化 UPDATE 条件中新增了 `receiver_id == park.id` 防护条件，强制要求只有收到提议的本人才能拒绝交易，有效防范了 IDOR 权限越权漏洞。同时，为防止已灭亡用户的交易提议持续滞留在市场中（僵尸交易），我们修改了 `trade_market()` 查询，在 SQL 阶段 JOIN `Park` 模型，仅动态筛选出发送方依然生存（`is_destroyed == False`）的交易提议进行显示。
 - **Q: 在慢速路径（消耗轮次与 NPC 轮次同步）执行期间，若其他异步请求扣除 AP，是否会因过期内存覆写（Lost Update）而导致 AP 复制（免费使用）？**
   - **A:** [v1.8.8] 我们已高度缓解了 AP 复制（Lost Update）缺陷。即使在慢速路径的无锁同步间隙期间，并发的快速路径请求成功扣除了 AP，慢速路径的端点也会**重新取得玩家公园的悲观锁并强制执行 `refresh` 数据刷新**，随后才进行最终的 AP 减算，从而确保了数据的高度一致性与原子性。 (audit_report_56.md [STATE-F029])
 - **Q: 在 NPC 轮次进行中发生战斗时，会因 `ResourceClosedError` 等错误导致轮次同步中断 or 陷入无限循环吗？另外，行动失败时退还的 AP 会流失吗？或是密使归还后的过密处理时会因 Lost Update 造成资源消失或复制吗？**
-  - **A:** [v1.8.9] 已高度缓解。NPC 战斗内部的 `commit()` 已被替换为 `flush()` 以保护嵌套的 Savepoint，并采用双重回滚异常防御。退还的 AP 在路由异常区段内会立即执行显式的 `db.session.commit()`，防止回滚流失。最后，在 `_process_spy_missions` 的过密处理前，系统会对玩家公园再次获取 `with_for_update()` 悲观锁并获取 `refresh`，高度预防并发请求对数据的覆盖（Lost Update）。
-- **Q: 当 NPC 攻击玩家 or 其他公园时，是否会因锁定获取顺序冲突而导致死锁（Deadlock）并耗尽 DB 连接？**
+  - **A:** [v1.8.9] 已高度缓解。NPC 战斗内部的 `commit()` 已被替换为 `flush()` 以保护嵌套的 Savepoint，并采用双重回滚异常防御。退还的 AP 在路由异常区段内会立即执行显式的 `db.session.commit()`，防止回滚流失。最后，在 `_process_spy_missions` 的过密处理前，系统会对玩家公园再次获取 `with_for_update()` 悲观锁并执行 `refresh`，高度预防并发请求对数据的覆盖（Lost Update）。
+- **Q: 当 NPC 攻击玩家或其他公园时，是否会因锁定获取顺序冲突而导致死锁（Deadlock）并耗尽 DB 连接？**
   - **A:** [v1.8.9] 已高度防范死锁漏洞 `[DEADLOCK-F005]`。我们已永久移除了在 `process_npc_turn()` 开始时无条件先行获取的悲观锁（`with_for_update()`），改为仅进行单纯刷新（`refresh`），同时在上位轮次同步调度器 `_sync_npc_turns()` 中，NPC 基本轮次处理（`process_turn`）完成后立即强制执行 `db.session.commit()` 以完全释放先行锁，随后将 `process_npc_turn()` 作为独立事务启动，全方位采用了**两阶段事务边界分离结构**。因此，当 NPC 发动攻击时，两个公园的锁仅会在 `execute_battle()` 内部依据 Canonical Ordering（按 ID 升序排序）安全地同时获取。这高度预防了因相互锁等待冲突导致的死锁及数据库连接池枯竭的问题。
