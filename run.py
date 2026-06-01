@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 실장석 공원 제국 - 서버 실행 진입점 (run.py)
-[v1.0.0] 개발 서버 실행. Gunicorn에서도 app 객체 직접 사용 가능.
+[v1.8.9] 개발 서버 실행. Gunicorn에서도 app 객체 직접 사용 가능.
 
 사용법:
-    venv/bin/python run.py                  # 가상환경 내 개발 서버 기동 (또는 venv 활성화 후 python run.py)
-    gunicorn --bind 0.0.0.0:8000 "run:app"  # 프로덕션 서버
+    venv/bin/python run.py                  # 가상환경 내 개발 서버 기동 (또는 venv 활성화 후 python3 run.py)
+    gunicorn --bind 127.0.0.1:8000 "run:app"  # Nginx 뒤에서 사용하는 프로덕션 서버
 """
 import os
 import sys
@@ -49,7 +49,7 @@ app = create_app()
 
 if __name__ == '__main__':
     print("=" * 60)
-    print("  Jissou Park Empire v0.1.0")
+    print("  Jissou Park Empire v1.8.9")
     print("  http://localhost:5000")
     print("=" * 60)
 

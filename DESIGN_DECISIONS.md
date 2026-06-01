@@ -37,7 +37,7 @@
 |-----------|-----------|-------------------|
 | **SQLite + 단일 워커 (Single Worker)** | **공식 권장 (Supported)** | 개발 및 1인용/소규모 세션에 안정적으로 정합하는 조합입니다. SQLite의 단일 쓰기 lock과 WAL 모드 자동 활성화를 통해 단일 스레드 기동 범위 내의 데이터 흐름 일관성을 보증합니다. 다만 SQLite 환경에서 `with_for_update()`는 실제 DB 행 락(Row Lock)을 걸지 않는 무효(no-op) 상태이므로, Flask 개발 서버 구동 시 thread 1개와 단일 동시 쓰기 조건 하에서만 정합성이 온전히 유지됩니다. |
 | **SQLite + 다중 워커 (Multi Worker)** | **제한 지원 (Accepted Risk / Limited)** | 다중 프로세스(Gunicorn 등) 간의 DB 쓰기 경쟁 시 일시적 경합에 의한 `Database Locked`가 발생할 수 있습니다. 커넥션 즉시 `PRAGMA busy_timeout=5000`을 강제 활성화하여 이를 완화하지만, 극도의 쓰기 부하 상태에서의 경합은 수용해야 할 위험(Accepted Risk)으로 정의합니다. <br>※ **Accepted Risk 상세 규격**:<br>- **책임자(Owner)**: `Project Lead Architect / Eunho Lim`<br>- **수용 사유**: 초경량 zero-setup 및 호스팅 간소화를 위해 SQLite의 태생적 파일 락 제약 및 동시성 쓰기 경합 병목을 수용함.<br>- **운영 제한**: Gunicorn workers는 최대 2개로 제한하며, sync worker 모델 및 단일 thread(thread=1) 기동을 강제함.<br>- **만료 조건**: 동시 활성 유저(DAU) 100명 초과 또는 초당 평균 10회 이상의 DB 쓰기 요청 유발 시.<br>- **재검토 조건**: `Database Locked` (busy_timeout 초과) 에러가 주 3회 이상 감지되거나 동시성 레이스로 인한 유저 데이터 정합성 유실 사고 발생 시 PostgreSQL로의 즉각 강제 전환 프로파일 가동. |
-| **PostgreSQL/MySQL + 다중 워커** | **공식 프로덕션 대상 (Target Production / Accepted Risk)** | 상용 서비스 및 대규모 다중 접속을 위한 최적 조합입니다. 본 프로젝트의 2중 ID 정렬(Canonical Order) 비관적 락 설계와 2단계 트랜잭션 경계 분리 구조가 PostgreSQL/MySQL 등 네이티브 행 락(Row Lock)과 강력하게 결합하여 높은 수준의 동시 처리를 제공하도록 설계되었습니다. <br>※ **Accepted Risk 상세 규격 (PostgreSQL/MySQL 실 DB row-lock/deadlock 미검증)**:<br>- **책임자(Owner)**: `Project Lead Architect / Eunho Lim`<br>- **수용 사유**: 현재 개발/테스트 인프라 제약으로 인해 실제 PostgreSQL/MySQL 인스턴스를 통한 다중 worker 부하 및 row-lock/deadlock E2E 검증은 수행하지 않았으며, ID Canonical Ordering 설계적 안전성만을 확보한 상태에서 운영 위험을 잠재적으로 수용함.<br>- **만료 조건**: 프로덕션 DB로 실제 PostgreSQL/MySQL 이주 완료 및 해당 DB 상에서 다중 스레드 부하 테스트/교착 검증 스위트를 최초로 수행 및 통과하는 시점.<br>- **재검토 조건**: 실제 RDBMS 프로덕션 이주 후 lock timeout 또는 deadlock 경보가 시스템 상에서 최초로 주 1회 이상 감지되는 시점. |
+| **PostgreSQL/MySQL + 다중 워커** | **공식 프로덕션 대상 (Target Production / Accepted Risk)** | 상용 서비스 및 대규모 다중 접속을 고려한 주요 조합입니다. 본 프로젝트의 2중 ID 정렬(Canonical Order) 비관적 락 설계와 2단계 트랜잭션 경계 분리 구조가 PostgreSQL/MySQL 등 네이티브 행 락(Row Lock)과 연결되어 동시 처리를 지원하도록 설계되었습니다. <br>※ **Accepted Risk 상세 규격 (PostgreSQL/MySQL 실 DB row-lock/deadlock 미검증)**:<br>- **책임자(Owner)**: `Project Lead Architect / Eunho Lim`<br>- **수용 사유**: 현재 개발/테스트 인프라 제약으로 인해 실제 PostgreSQL/MySQL 인스턴스를 통한 다중 worker 부하 및 row-lock/deadlock E2E 검증은 수행하지 않았으며, ID Canonical Ordering 설계적 안전성만을 확인한 상태에서 운영 위험을 제한적으로 수용함.<br>- **만료 조건**: 프로덕션 DB로 실제 PostgreSQL/MySQL 이주 완료 및 해당 DB 상에서 다중 스레드 부하 테스트/교착 검증 스위트를 최초로 수행 및 통과하는 시점.<br>- **재검토 조건**: 실제 RDBMS 프로덕션 이주 후 lock timeout 또는 deadlock 경보가 시스템 상에서 최초로 주 1회 이상 감지되는 시점. |
 
 ---
 
@@ -59,7 +59,7 @@
 
 ### 결과
 - 모든 게임 로직은 Python 엔진에 집중. 클라이언트는 표시만 담당.
-- APK 이식 시 Python 게임 로직 100% 재사용 가능.
+- APK 이식 시 Python 게임 로직 재사용 구조를 유지할 수 있음.
 - 폼 POST + 리다이렉트 패턴으로 CSRF 보호가 자연스럽게 적용.
 
 ---
@@ -99,7 +99,7 @@
 - **JSON 파일 기반 번역**: `app/lang/{lang}.json`, `app/lang/dialogues_{lang}.json`.
 - **세션 기반 언어 저장**: `session['lang'] = 'ko'`.
 - **Jinja2 전역 함수**: `{{ t('key') }}`.
-- **Python 모듈 `__getattr__`**: 기존 `DLG.GATHER_SUCCESS_BIG` 코드 100% 호환 유지.
+- **Python 모듈 `__getattr__`**: 기존 `DLG.GATHER_SUCCESS_BIG` 코드와의 호환 유지.
 
 ### 대안과 기각 사유
 | 대안 | 기각 사유 |
@@ -130,7 +130,7 @@
 | 대안 | 기각 사유 |
 |------|----------|
 | 낙관적 락 (version 필드) | SQLite에서 복잡, 구현 부담 |
-| 비관적 락 (SELECT FOR UPDATE) | SQLite 지원 불완전 |
+| 비관적 락 (SELECT FOR UPDATE) | SQLite 지원 불전체 |
 | 교역 중개인(NPC) | 플레이어 간 직접 교역의 재미 감소 |
 
 ### 결과
@@ -147,14 +147,14 @@
 
 ### 결정
 - **약한 공원 보호**: 경호 < 5 OR 성체 < 15 시 보호 모드 진입.
-- **자동 자원 리셋**: 진입 시 최소 생존 자원 보장.
+- **자동 자원 리셋**: 진입 시 최소 생존 자원 유지.
 - **해제 조건 명확화**: 경호 ≥ 5 AND 성체 ≥ 15.
 
 ### 대안과 기각 사유
 | 대안 | 기각 사유 |
 |------|----------|
 | 뉴비 방패 (가입 후 N턴) | 고인물이 뉴비 계정 파밍 가능 |
-| 완전 무적 (영구) | 중후반 긴장감 상실 |
+| 무적 (지속) | 중후반 긴장감 상실 |
 | 사기 기반 보호 | 사기 시스템과 중복, 복잡도 증가 |
 
 ### 결과
@@ -177,11 +177,11 @@
 | 대안 | 기각 사유 |
 |------|----------|
 | ceil() 올림 | 항상 1명 → 너무 가혹 |
-| 고정 손실 (최소 1명) | 1명 출정 시 100% 사망 → 너무 가혹 |
+| 고정 손실 (최소 1명) | 1명 출정 시 즉시 사망 → 너무 가혹 |
 | float 그대로 저장 | 모델 필드가 int → DB 오류 |
 
 ### 결과
-- 소수점 Exploit 완전 차단.
+- 소수점 Exploit을 설계 레벨에서 차단.
 - 기대값은 동일하지만 분산이 추가되어 전략의 불확실성 증가.
 
 ---
@@ -242,13 +242,13 @@
 
 ### 결정
 - **DEBUG 모드 전용 가드**: `if not current_app.config.get('DEBUG'): return error`.
-- 프로덕션(`FLASK_ENV=production`)에서는 완전히 차단.
+- 프로덕션(`FLASK_ENV=production`)에서는 차단.
 
 ### 대안과 기각 사유
 | 대안 | 기각 사유 |
 |------|----------|
 | 환경 변수 분리 | 코드 복잡도, 설정 누락 위험 |
-| 라우트 완전 삭제 | 개발 불편 |
+| 라우트 전체 삭제 | 개발 불편 |
 | 관리자 권한 체크 | 관리자 시스템 미구현 |
 
 ### 결과
@@ -323,7 +323,7 @@
 
 ### 결과
 - HTML 템플릿 파일 내에서 클래스 조합만으로 정밀하고 현대적인 Brutalist UI 완성 가능.
-- CSS 빌드 단계가 없으므로 SQLite 및 zero-setup 원칙에 완벽히 부합함.
+- CSS 빌드 단계가 없으므로 SQLite 및 zero-setup 원칙에 정밀하게 부합함.
 
 ---
 
@@ -331,7 +331,7 @@
 
 ### 배경
 - 디자인 사양서에 포함된 `boss_skill_protocol` (스킬 트리 및 SP 시스템)은 실제 백엔드 데이터 모델 및 게임 로직에 미구현된 기치임.
-- 그러나 고도의 BBS 감성을 배가하고 향후 업데이트 방향성을 제시하기 위한 시각적 매개체가 필요함.
+- 그러나 높은 BBS 감성을 배가하고 향후 업데이트 방향성을 제시하기 위한 시각적 매개체가 필요함.
 
 ### 결정
 - **skills.html 템플릿 추가 및 가상 모크업(이스터에그) 구현**.
@@ -341,7 +341,7 @@
 ### 대안과 기각 사유
 | 대안 | 기각 사유 |
 |------|----------|
-| 완전 제외 (미구현) | 디자인 레퍼런스의 화려한 CRT 격자 스킬 노드 렌더링 감성을 완전히 포기하게 됨 |
+| 부분 제외 (미구현) | 디자인 레퍼런스의 화려한 CRT 격자 스킬 노드 렌더링 감성을 상당히 포기하게 됨 |
 | 실제 백엔드 스킬 로직 구현 | DB 스키마 변경, AP 시스템 및 전투/인프라 공식 대대적 수정 필요로 기획 범위 초과 및 밸런스 붕괴 위험 |
 
 ### 결과
@@ -354,12 +354,12 @@
 
 ### 배경
 - v1.7.0까지 보호 모드 자원 보충 및 탈출 플래그 설정 시, GET `/dashboard` 진입과 비동기 POST 액션(/attack 등) 간의 TOCTOU Race Condition으로 인해 다른 트랜잭션이 반영한 최신 DB 값을 대시보드 커밋 시점에 구버전 메모리 값으로 덮어써버리는 Lost Update 문제가 잔존함.
-- 또한, `/restart` 라우트에서 기존 공원의 삭제와 신규 공원의 생성을 두 개의 독립된 트랜잭션(`commit()` 2회 호출)으로 처리하면서, 중복 클릭이나 서버 타임아웃 등으로 인해 유저의 공원 데이터가 DB 상에서 증발하는 현상(Lost User Park)이 발생할 수 있었음. 이로 인해 무한 리다이렉트(`ERR_TOO_MANY_REDIRECTS`) 루프가 발생하여 계정이 완전히 먹통이 됨.
+- 또한, `/restart` 라우트에서 기존 공원의 삭제와 신규 공원의 생성을 두 개의 독립된 트랜잭션(`commit()` 2회 호출)으로 처리하면서, 중복 클릭이나 서버 타임아웃 등으로 인해 유저의 공원 데이터가 DB 상에서 증발하는 현상(Lost User Park)이 발생할 수 있었음. 이로 인해 무한 리다이렉트(`ERR_TOO_MANY_REDIRECTS`) 루프가 발생하여 계정이 먹통이 됨.
 
 ### 결정
 - **비관적 락 및 리프레시 강제**: `check_and_enter_protection(park)` 시작 부근에 `Park.query.with_for_update()` 비관적 락을 얻고 `db.session.refresh(park)`를 강제하여 항상 최신 DB 데이터를 기반으로 락을 건 채 로직이 수행되도록 함.
 - **재시작 트랜잭션 단일 원자화**: `/restart` 에서의 이중 커밋을 제거하고 `db.session.delete(park)` 이후에 즉시 `game_engine.create_default_park` 를 호출하여 최종적으로 단 한 번의 커밋만 실행되도록 롤백 가능한 단일 트랜잭션으로 통합.
-- **다층 방어형 자동 공원 복구**: 유저가 어떤 경로(루트 `/`, `/login`, `/dashboard`)로든 접근했을 때 `park`이 유실된 상태인 경우, 예외 없이 기본 사양의 공원을 즉각 자동 재생성(`game_engine.create_default_park`)해주는 무결점 자동 복구 가드를 장착.
+- **다층 방어형 자동 공원 복구**: 유저가 어떤 경로(루트 `/`, `/login`, `/dashboard`)로든 접근했을 때 `park`이 유실된 상태인 경우, 예외 없이 기본 사양의 공원을 즉각 자동 재생성(`game_engine.create_default_park`)해주는 개선된 자동 복구 가드를 장착.
 
 ### 대안과 기각 사유
 | 대안 | 기각 사유 |
@@ -368,8 +368,8 @@
 | 에러 페이지 강제 노출 | 사용자의 게임 플레이 동선이 끊기고 이탈률 증가 |
 
 ### 결과
-- GET/POST 요청이 고도로 겹치는 동시성 환경에서도 자원/인구 Lost Update가 100% 방지됨.
-- 임의의 원인으로 공원이 유실되는 대형 예외 상황에서도 무한 리다이렉트 핑퐁 없이 자연스럽게 자동 복구되어 시스템 무결성 극대화.
+- GET/POST 요청이 상당히 겹치는 동시성 환경에서도 자원/인구 Lost Update가 낮춰짐 (회귀 테스트 범위 내 검증).
+- 임의의 원인으로 공원이 유실되는 대형 예외 상황에서도 무한 리다이렉트 핑퐁 없이 자연스럽게 자동 복구되어 시스템 안정성 향상.
 
 ---
 
@@ -383,17 +383,17 @@
 - **DB 비관적 락으로 스레드 락 전면 대체**: `trade_create` 및 `_sync_npc_turns` 상의 `threading.Lock`을 DB 레벨의 `with_for_update()` 비관적 락 획득으로 변경함. 특히 NPC 락은 ID 오름차순 정렬로 락을 획득하여 데드락을 방지하고 인메모리 상에서 높은 수준의 직렬화를 달성함.
 - **turn_count 동기화 가드**: 락 대기 후 중복 연산을 차단하기 위해 `npc_park.turn_count >= player_park.turn_count` 조건 검사식 가드를 추가하여 NPC Stampede를 최종 종식함.
 - **passive_growth 원자적 UPDATE 전환**: `_npc_passive_growth` 내 상태 변경을 SQLAlchemy `case()` 문을 사용해 단 한 번의 원자적 SQL `UPDATE` 로 실행하도록 전환하여 uncommitted dirty 메모리 상태 유지를 차단하고 `autoflush` Lost Update를 방어함.
-- **commit=False 인입 제어**: 범용 엔진 함수(`action_*`)들에 `commit=True` 매개변수를 추가하고 NPC 연산 호출 시 `commit=False`를 지정하여 모든 행동을 누적한 후, `_sync_npc_turns` 에서 오직 턴 완료 시점에만 단 한 번 최종 커밋되도록 보장하여 트랜잭션 무결성을 이룸.
+- **commit=False 인입 제어**: 범용 엔진 함수(`action_*`)들에 `commit=True` 매개변수를 추가하고 NPC 연산 호출 시 `commit=False`를 지정하여 모든 행동을 누적한 후, `_sync_npc_turns` 에서 오직 턴 완료 시점에만 단 한 번 최종 커밋되도록 유지하여 트랜잭션 무결성을 이룸.
 
 ### 대안과 기각 사유
 | 대안 | 기각 사유 |
 |------|----------|
 | Redis 분산 락 도입 | 추가 인프라 구축(Redis 데몬 기동) 필요로 프로젝트의 zero-setup SQLite 경량 지향 원칙에 저촉됨 |
-| PostgreSQL/MySQL 등의 Row-lock DB 강제 도입 | DB 설치 및 구성 절차의 진입 장벽을 대폭 높이고 single-file DB zero-setup 이점을 상실함. 대신 SQLite dialect가 `with_for_update()`를 해석하지 않고 무시(no-op)하더라도, 다중 프로세스(Gunicorn) 프로덕션 환경 하에 PostgreSQL/MySQL 등 실제 행 락(Row Lock)을 지원하는 DBMS로 수평 확장할 때의 소스 코드 호환성과 동시성 격리 무결성을 사전에 확보하기 위해 **2중 ID 정렬(Canonical Order) 락 설계를 코드 전반에 구축 및 적극 유지**하기로 결정함. SQLite 환경에서는 `Engine` 커넥션 이벤트 리스너를 통해 연결 시점 즉시 `PRAGMA journal_mode=WAL` 및 `PRAGMA busy_timeout=5000`을 강제 주입하여 WAL 및 busy_timeout 설정을 실제로 자동 전개하며, SQLite 고유의 단일 쓰기 트랜잭션 파일 락 모델 및 2단계 트랜잭션 분리 구조와 맞물려 Database Locked 오류를 원천 차단하고 동시 쓰기 정합성을 극대화합니다. |
+| PostgreSQL/MySQL 등의 Row-lock DB 강제 도입 | DB 설치 및 구성 절차의 진입 장벽을 대폭 높이고 single-file DB zero-setup 이점을 상실함. 대신 SQLite dialect가 `with_for_update()`를 해석하지 않고 무시(no-op)하더라도, 다중 프로세스(Gunicorn) 프로덕션 환경 하에 PostgreSQL/MySQL 등 실제 행 락(Row Lock)을 지원하는 DBMS로 수평 확장할 때의 소스 코드 호환성과 동시성 격리를 위해 **2중 ID 정렬(Canonical Order) 락 설계를 코드 전반에 구축 및 적극 유지**하기로 결정함. SQLite 환경에서는 `Engine` 커넥션 이벤트 리스너를 통해 연결 시점 즉시 `PRAGMA journal_mode=WAL` 및 `PRAGMA busy_timeout=5000`을 강제 주입하여 WAL 및 busy_timeout 설정을 실제로 자동 전개하며, SQLite 고유의 단일 쓰기 트랜잭션 파일 락 모델 및 2단계 트랜잭션 분리 구조와 맞물려 Database Locked 오류를 차단하고 동시 쓰기 정합성을 유지합니다. |
 
 ### 결과
-- 다중 프로세스 프로덕션 환경에서도 교역 제한 및 NPC 턴 직렬화가 안정적으로 보장됨.
-- NPC 턴 중 예외 발생 시의 롤백 정합성과 플레이어 행동 간의 Lost Update 문제가 완전히 종식됨.
+- 다중 프로세스 프로덕션 환경에서도 교역 제한 및 NPC 턴 직렬화가 안정적으로 유지됨.
+- NPC 턴 중 예외 발생 시의 롤백 정합성과 플레이어 행동 간의 Lost Update 문제가 낮춰짐.
 
 ---
 
@@ -401,7 +401,7 @@
 
 ### 배경
 - [STATE-F023] v1.7.0까지 Ghost AP 방지 및 동시성 락 충돌 방지를 위해 `consume_turn()`에서 AP를 선행 차감 및 조기 커밋(Early Commit)하는 분할 트랜잭션(Split Transaction) 아키텍처를 도입했음.
-- 그러나 이로 인해 행동 라우트(채집, 출산, 건설, 훈련, 침공 등) 내부의 2차 검증(예: 파업 중, 자원 차감 실패 등)으로 행동이 도중에 중단(`not success`)되거나 기각될 때, 이미 커밋된 AP 자원이 복구되지 못하고 영구적으로 증발하는 심각한 AP 누수(AP Leakage / Ghost Deduction) 현상이 새로이 파생되었음.
+- 그러나 이로 인해 행동 라우트(채집, 출산, 건설, 훈련, 침공 등) 내부의 2차 검증(예: 파업 중, 자원 차감 실패 등)으로 행동이 도중에 중단(`not success`)되거나 기각될 때, 이미 커밋된 AP 자원이 복구되지 못하고 지속적으로 증발하는 심각한 AP 누수(AP Leakage / Ghost Deduction) 현상이 새로이 파생되었음.
 
 ### 결정
 - **보상 트랜잭션(Compensating Transaction) 패턴 도입**:
@@ -417,7 +417,7 @@
 | 예외 발생 시 전역 롤백 의존 | 조기 커밋으로 이미 트랜잭션이 종결 및 커밋되었으므로 롤백에 의한 복구가 논리적으로 불가능함 |
 
 ### 결과
-- 턴 쿼터와 AP 시스템의 조기 커밋 설계를 그대로 유지하여 동시성 충돌을 차단하면서도, 행동 검증 실패 시 즉시 보상 트랜잭션(AP 환불)이 작동하여 AP가 증발하지 않는 100% 무결한 자원 보존성을 확보함.
+- 턴 쿼터와 AP 시스템의 조기 커밋 설계를 그대로 유지하여 동시성 충돌을 줄이면서도, 행동 검증 실패 시 즉시 보상 트랜잭션(AP 환불)이 작동하여 AP가 증발하는 현상을 상당히 방지하여 자원 보존성을 유지함.
 - 공용 복구 헬퍼 기반으로 설계가 통일되어 코드 가독성과 예외 복구 신뢰성이 대폭 개선됨.
 
 ---
@@ -431,7 +431,7 @@
 
 ### 결정
 - **턴 소비 진행 후 멸망 즉시 차단**:
-  - `app/game_engine.py` 의 `consume_turn()` 내부에서 `process_turn(park)` 호출 및 `db.session.refresh(park)` 완료 직후, `if park.is_destroyed: return False, ['공원이 멸망한 데스...']` 검증 가드를 신설하여 턴 경과로 멸망한 즉시 행동 진행을 원천 기각하고 안전 종료함.
+  - `app/game_engine.py` 의 `consume_turn()` 내부에서 `process_turn(park)` 호출 및 `db.session.refresh(park)` 완료 직후, `if park.is_destroyed: return False, ['공원이 멸망한 데스...']` 검증 가드를 신설하여 턴 경과로 멸망한 즉시 행동 진행을 기각하고 안전 종료함.
 - **비관적 락 직후 원자적 상태 재검증**:
   - `/trade/accept` 라우트에서 비관적 락을 오름차순으로 획득하고 객체를 리프레시한 직후, `park.is_destroyed or sender.is_destroyed` 여부를 재검사하여, 수락 중에 상대방이 멸망한 경우 교역을 만료(`expired`) 처리하고 즉각 롤백 및 에러 피드백을 주도록 수정함.
   - `execute_battle` 전투 엔진 내에서도 비관적 락 획득 및 리프레시 직후, `attacker.is_destroyed or defender.is_destroyed`를 재검사하여 이미 멸망한 공원과의 전투는 일절 개시되지 않도록 차단함.
@@ -439,25 +439,25 @@
 ### 대안과 기각 사유
 | 대안 | 기각 사유 |
 |------|----------|
-| 락 획득 전 사전 검사만 신뢰 | 비동기 레이스 컨디션 하에 락 획득 대기 시간 동안 일어나는 상태 전이(TOCTOU)를 원천적으로 방어할 수 없음 |
+| 락 획득 전 사전 검사만 신뢰 | 비동기 레이스 컨디션 하에 락 획득 대기 시간 동안 일어나는 상태 전이(TOCTOU)를 직접 방어할 수 없음 |
 | 멸망 시 세션 즉시 강제 파괴 | 세션 파괴만으로는 다른 스레드에서 전송되는 비동기 API 요청이나 대기 중이던 락 대기 요청의 좀비 액션 차단 불가 |
 
 ### 결과
-- 턴 진행 도중 멸망한 공원의 좀비 액션을 빈틈없이 방어하고, 동시성 비관적 락 획득 후에도 상태 재검증 가드를 엄격히 적용함으로써 경제 교역 시스템과 전투 매칭의 데이터 무결성을 안정적으로 보장함.
+- 턴 진행 도중 멸망한 공원의 좀비 액션을 빈틈없이 방어하고, 동시성 비관적 락 획득 후에도 상태 재검증 가드를 엄격히 적용함으로써 경제 교역 시스템과 전투 매칭의 데이터 무결성을 안정적으로 유지함.
 
 ## 19. Cascade Delete 시의 에스크로 자원 및 유닛 유실 방지를 위한 DB 이벤트 기반 원자적 환불 도입
 
 ### 배경
 - [STATE-F025] 교역(`TradeOffer`) 및 밀사(`SpyMission`) 모델은 상대방(수신자/타겟)이 공원을 삭제할 때(`db.session.delete(park)`) 고아 레코드가 되는 것을 방지하기 위해 `cascade='all, delete-orphan'` 관계 설정을 가지고 있음.
 - 그러나 교역 제안 시 자원이 선차감되고 밀사 파견 시 성체실장 1마리가 선차감되는 **에스크로(Escrow) 방식**을 사용하므로, 상대방 유저가 재시작(`/restart`) 등을 실행해 공원을 삭제하면 대기 중인 거래 및 스파이 임무 레코드가 DB에서 함께 연쇄 삭제(Cascade Delete)됨.
-- 이 과정에서 이미 차감된 발신자(Sender)의 에스크로 자원과 유닛이 환불되지 않고 영구히 증발하는 자원 누수(Resource Leakage) 취약점이 존재하며, 이를 악용한 자원 탈취 및 악의적인 트롤링 공격 시나리오가 가능함.
+- 이 과정에서 이미 차감된 발신자(Sender)의 에스크로 자원과 유닛이 환불되지 않고 지속적으로 증발하는 자원 누수(Resource Leakage) 취약점이 존재하며, 이를 악용한 자원 탈취 및 악의적인 트롤링 공격 시나리오가 가능함.
 
 ### 결정
 - **SQLAlchemy Event Listener (`before_delete`) 기반 원자적 환불 도입**:
   - `app/models.py` 최하단에 `TradeOffer` 및 `SpyMission` 삭제 전에 반응하는 `before_delete` 이벤트 리스너를 장착함.
   - `TradeOffer` 삭제 전 (`before_delete`): 삭제되는 거래의 상태가 `status == 'pending'`인 경우, `object_session(target)`을 통해 발신자 공원(`sender_id`)이 함께 삭제 중(`session.deleted`)인지 재검사한 뒤, 안전하게 살아있는 공원에 대해 에스크로 자원(콘페이토, 음쓰, 자재, 저실장)을 환불하고 한도 조절(Cap Clamping)을 수행함.
   - `SpyMission` 삭제 전 (`before_delete`): 삭제되는 밀사 임무의 상태가 `status == 'active'`인 경우, 발신자 공원(`sender_id`)이 함께 삭제 대상인지 재검사한 뒤, 생존한 공원에 대해 성체실장 1마리를 즉시 환불(`adult_count += 1`) 조치함.
-- 이 방식은 개별 비즈니스 라우트 내부나 엔진 함수에서 파편화되거나 실수로 누락될 수 있는 환불 안전망을 DB 레벨(이벤트 리스너)에서 강제할 수 있어 높은 수준의 데이터 무결성을 보장함.
+- 이 방식은 개별 비즈니스 라우트 내부나 엔진 함수에서 파편화되거나 실수로 누락될 수 있는 환불 안전망을 DB 레벨(이벤트 리스너)에서 강제할 수 있어 높은 수준의 데이터 무결성을 유지함.
 
 ### 대안과 기각 사유
 | 대안 | 기각 사유 |
@@ -466,7 +466,7 @@
 | `/restart` 라우트 내부에 개별 환불 인라인 코드 삽입 | `/restart` 외의 다른 경로(예: 회원 탈퇴, 관리자 조작 등)로 공원이 삭제될 때 연쇄 삭제되는 거래의 에스크로 자원 유실을 효과적으로 방어할 수 없음 |
 
 ### 결과
-- 수신자/타겟 공원이 삭제되어 Cascade Delete가 발생하는 어떠한 예외 상황(재시작, 회원탈퇴 등)에서도 대기 중이던 발신자의 자원 및 파견 중인 유닛이 자동으로 복구되는 강력한 데이터 유실 방어망을 구축함.
+- 수신자/타겟 공원이 삭제되어 Cascade Delete가 발생하는 어떠한 예외 상황(재시작, 회원탈퇴 등)에서도 대기 중이던 발신자의 자원 및 파견 중인 유닛이 자동으로 복구되는 데이터 유실 방지 수단을 구축함.
 - 이벤트 리스너에서 환불을 수행하므로, 삭제 트랜잭션과 동일한 단위 내에서 원자적으로 안전하게 작동 및 커밋되어 성능 및 정합성이 극대화됨.
 
 ## 20. 외교 교차 중복 생성 방지를 위한 Canonical Ordering 및 2-Way Lock 도입
@@ -478,8 +478,8 @@
 ### 결정
 - **Canonical Ordering (표준 순서 강제) 도입**:
   - `Diplomacies` 테이블에 데이터를 저장할 때 항상 `park_a_id = min(A, B)`, `park_b_id = max(A, B)`인 표준 순서를 강제하여 저장하도록 아키텍처를 개편함.
-  - 이로 인해 `(A, B)`와 `(B, A)`의 교차 쌍이 존재하지 않게 되어, 기존 DB의 UniqueConstraint가 교차 동시 요청을 안정적으로 감지해 중복 생성을 원천 방지함.
-  - min/max 정렬에 의해 유실되는 '요청 발송인' 정보를 보존하고 수락 권한을 정교히 검증하기 위해 `initiator_id` 외래키 컬럼을 새롭게 추가하여 수락/거절 권한(자신이 보낸 제안을 스스로 수락하는 행위 차단 등)을 정확히 보장함.
+  - 이로 인해 `(A, B)`와 `(B, A)`의 교차 쌍이 존재하지 않게 되어, 기존 DB의 UniqueConstraint가 교차 동시 요청을 안정적으로 감지해 중복 생성을 방지함.
+  - min/max 정렬에 의해 유실되는 '요청 발송인' 정보를 보존하고 수락 권한을 정교히 검증하기 위해 `initiator_id` 외래키 컬럼을 새롭게 추가하여 수락/거절 권한(자신이 보낸 제안을 스스로 수락하는 행위 차단 등)을 정확히 유지함.
 - **2-Way Pessimistic Lock (2중 비관적 락) 적용**:
   - 외교 관계를 생성, 수락, 해제하는 모든 라우트 진입로에 `park.id`와 `target.id` 두 ID를 오름차순으로 정렬하여 `with_for_update()` 락을 획득함. 순차 락을 통해 교차 요청 시에도 데드락(Deadlock)을 방지하고 트랜잭션의 순서 정합성을 직렬화함.
 - **Bulk Update (일괄 상태 해제) 전환**:
@@ -488,12 +488,12 @@
 ### 대안과 기각 사유
 | 대안 | 기각 사유 |
 |------|----------|
-| 수락 시점에만 중복 조회 후 삭제 | 동시에 pending이 수락되어 active가 되는 락 획득 대기 시간 동안의 레이스 컨디션(TOCTOU)을 완전히 방어할 수 없음 |
+| 수락 시점에만 중복 조회 후 삭제 | 동시에 pending이 수락되어 active가 되는 락 획득 대기 시간 동안의 레이스 컨디션(TOCTOU)을 상당히 방어할 수 없음 |
 | `/diplomacy/accept` 에서 본인 검증 생략 | 자신이 요청한 동맹을 스스로 수락하는 심각한 논리 정합성 붕괴 위험 파생 |
 
 ### 결과
-- 외교 동시성 레이스 컨디션을 완전히 종식하여, 2개 이상의 중복 동맹/적대 레코드가 생성되거나 "동맹이자 적대"라는 룰 모순 상태에 빠지는 정합성 붕괴 리스크를 구조적 차단 지향함.
-- 2중 정렬 락을 통해 분산 다중 워커 프로덕션 환경에서도 데드락 걱정 없는 안전한 트랜잭션 격리성을 확보함.
+- 외교 동시성 레이스 컨디션을 정리하여, 2개 이상의 중복 동맹/적대 레코드가 생성되거나 "동맹이자 적대"라는 룰 모순 상태에 빠지는 정합성 붕괴 리스크를 구조적 차단 지향함.
+- 2중 정렬 락을 통해 분산 다중 워커 프로덕션 환경에서도 데드락 걱정 없는 안전한 트랜잭션 격리성을 유지함.
 
 ---
 
@@ -503,18 +503,18 @@
 - [v1.8.1]에서 NPC 턴 진행을 원자화하기 위해 `_sync_npc_turns` 상단에서 모든 NPC를 `with_for_update().all()`로 일괄 쿼리하여 비관적 락을 획득함.
 - 그러나 루프 내부에 존재하는 `db.session.commit()` 호출로 인해 첫 번째 NPC 처리가 끝난 직후 **전체 트랜잭션이 커밋/종료되면서 세션이 비워지고 아직 처리하지 않은 나머지 모든 NPC들의 비관적 락도 즉시 해제**되는 결함이 발견됨 (audit_report_54.md [STATE-F028]).
 - 락이 풀린 나머지 NPC들에 대해 다른 프로세스나 세션이 개입하여 턴 진행을 완수할 수 있으며, 이 경우 원래 스레드가 다음 루프로 넘어가 해당 NPC들을 처리할 때 메모리에 남아있던 구버전(Stale) 객체를 플러시(`autoflush`)하며 덮어쓰는 **Lost Update**가 발생함.
-- 또한, NPC AI 행동 도중 예외가 발생하면 세션 오염 방지를 위해 `db.session.rollback()`을 호출했으나, 이는 **진입 시 획득했던 NPC 공원의 비관적 락까지 함께 소멸**시키며, 그동안 반영한 턴 진행 수치(`turn_count` 등)마저 날려버려 NPC의 무한 턴 반복(Stampede)을 일으키는 아키텍처적 위험에 무방비하게 노출됨 (audit_report_54.md [TRANSACTION-F005]).
+- 또한, NPC AI 행동 도중 예외가 발생하면 세션 오염 방지를 위해 `db.session.rollback()`을 호출했으나, 이는 **진입 시 획득했던 NPC 공원의 비관적 락까지 함께 소멸**시키며, 그동안 반영한 턴 진행 수치(`turn_count` 등)마저 날려버려 NPC의 무한 턴 반복(Stampede)을 일으키는 아키텍처적 위험에 그대로 노출됨 (audit_report_54.md [TRANSACTION-F005]).
 
 ### 결정
 - **루프 외부 ID 목록 추출 및 개별 루프 트랜잭션 분리**:
   - `_sync_npc_turns`에서 모든 NPC를 일괄 조회 및 락킹하는 대신, 루프 외부에서는 오직 NPC들의 ID 목록만 정렬 쿼리하도록 수정함.
-  - 루프 내부로 진입한 후, 개별 트랜잭션 단위로 각 NPC ID에 대해 단일 `with_for_update()` 비관적 락 쿼리를 기동하고, 처리가 끝나면 루프 내부에서 `db.session.commit()`을 수행하여 트랜잭션을 완전히 격리하도록 설계함.
+  - 루프 내부로 진입한 후, 개별 트랜잭션 단위로 각 NPC ID에 대해 단일 `with_for_update()` 비관적 락 쿼리를 기동하고, 처리가 끝나면 루프 내부에서 `db.session.commit()`을 수행하여 트랜잭션을 격리하도록 설계함.
 - **Nested Transaction (Savepoint)을 통한 락 보존**:
   - NPC AI의 각 행동(`action_func`) 시도 시, `db.session.begin_nested()`를 호출하여 개별 행동 단위의 **Nested Transaction (Savepoint)**를 시작함.
   - 성공적으로 수행되면 `nested.commit()`을 호출하고, 예외 발생 시 `nested.rollback()`을 통해 오직 해당 실패 행동에 대한 데이터만 롤백함.
   - 이를 통해 예외가 터지더라도 부모 트랜잭션과 비관적 락, 그리고 이전 단계의 턴 동기화 데이터(`turn_count` 등)가 유실 없이 안전하게 복구 및 유지되도록 정교히 보호함.
 - **밀사 2-Way Lock 동시성 방어**:
-  - 밀사 사보타주 진행 시 피해량 산정과 실제 원자적 UPDATE 간의 TOCTOU 계산 격차를 방어하고 로그 수치를 완전히 직렬화하기 위해 임무 진행 시작 전 두 공원에 대해 ID 정렬 2중 비관적 락을 먼저 획득하도록 보강함.
+  - 밀사 사보타주 진행 시 피해량 산정과 실제 원자적 UPDATE 간의 TOCTOU 계산 격차를 방어하고 로그 수치를 직렬화하기 위해 임무 진행 시작 전 두 공원에 대해 ID 정렬 2중 비관적 락을 먼저 획득하도록 보강함.
 
 ### 대안과 기각 사유
 | 대안 | 기각 사유 |
@@ -524,7 +524,7 @@
 
 ### 결과
 - NPC 턴 동기화 시 발생하는 동시성 충돌 및 Auto-Flush에 의한 Lost Update 결함을 구조적으로 해결함.
-- 예외 발생 시에도 비관적 락 유실 및 스탬피드 버그 없이 안전하게 트랜잭션을 격리하고 자가 복구할 수 있는 강력한 무결성을 100% 확보함.
+- 예외 발생 시에도 비관적 락 유실 및 스탬피드 버그 없이 안전하게 트랜잭션을 격리하고 자가 복구할 수 있는 안정적인 무결성을 설계 레벨에서 유지함 (PostgreSQL/MySQL 등 외부 RDBMS 실검증 전까지 Accepted Risk 수용 및 tests/test_regression.py 범위 내 검증).
 
 ---
 
@@ -533,7 +533,7 @@
 ### 배경
 - **[AUTH-F001] IDOR in Trade Reject**:
   - `trade_reject(trade_id)` API는 이전 `v1.7.0`에서 원자적 UPDATE 패턴을 도입해 Race Condition을 효과적으로 방어했으나, 현재 로그인한 유저(`current_user.park.id`)가 해당 교역의 정당한 수신자(`receiver_id`)인지를 검증하는 인가(Authorization) 제어가 결여되어 있었음.
-  - 이로 인해 임의의 사용자가 타인 간의 프라이빗 거래 ID나 공개 거래 ID를 변조하여 POST 요청을 보냄으로써 타인의 거래를 강제로 폭파(거절 처리)하고 시장 기능을 파괴(DoS)할 수 있는 Broken Access Control 위협에 무방비하게 노출됨.
+  - 이로 인해 임의의 사용자가 타인 간의 프라이빗 거래 ID나 공개 거래 ID를 변조하여 POST 요청을 보냄으로써 타인의 거래를 강제로 폭파(거절 처리)하고 시장 기능을 파괴(DoS)할 수 있는 Broken Access Control 위협에 그대로 노출됨.
 - **[LOGIC-F022] Zombie Trades in Public Market**:
   - 교역 시장에서 대기 중인 공개 교역(`TradeOffer`)을 조회할 때, 발송인(`sender_id`)이 이미 멸망(`is_destroyed == True`)한 상태인지 검증하지 않아 시장에 유령/좀비 거래 목록이 불필요하게 잔존하고 노출되는 쿼터/UI 낭비가 발생함.
   - 사용자가 이를 수락하려고 시도할 때에야 비관적 락 단계에서 `sender.is_destroyed`를 확인해 만료 처리되는데, 이는 UI적 피로감을 가중할 뿐 아니라 트랜잭션 경합 리소스를 불필요하게 낭비하는 문제를 야기함.
@@ -544,7 +544,7 @@
   - 이를 통해 본인에게 오지 않은 제3자의 교역이나 공개 교역에 대한 무단 거절 POST 요청이 발생할 경우 `updated == 0`으로 처리되어 API 레벨에서 차단 및 롤백이 즉각 수행됨.
 - **공개 시장 쿼리에 Park JOIN 및 생존 필터(`is_destroyed == False`) 강제화**:
   - `trade_market()` 공개 교역 목록 조회 쿼리 단계에서 `Park` 모델을 JOIN하고 `Park.is_destroyed == False` 필터를 강제 탑재하도록 개선함.
-  - 이를 통해 멸망한 사용자의 대기 교역이 시장 화면에 애초에 노출되지 않도록 사전 정화(Pre-filtration)하여 좀비 거래 노출로 인한 성능 낭비와 사용자 경험 저하를 원천 차단함.
+  - 이를 통해 멸망한 사용자의 대기 교역이 시장 화면에 애초에 노출되지 않도록 사전 정화(Pre-filtration)하여 좀비 거래 노출로 인한 성능 낭비와 사용자 경험 저하를 차단함.
 
 ### 대안과 기각 사유
 | 대안 | 기각 사유 |
@@ -553,8 +553,8 @@
 | 멸망 시점에 pending 중인 모든 공개 교역을 벌크로 만료 처리 | 멸망을 야기하는 APScheduler 백그라운드 턴 시뮬레이터와 플레이어의 액션 간에 교역 벌크 UPDATE 락 경합으로 인한 성능 저하를 방출하고, 쿼리 조회 단계에서 걸러내는 것이 훨씬 가볍고 부작용이 없음 |
 
 ### 결과
-- 교역 거절 API에 강력한 인가 가드를 삽입함으로써 Broken Access Control(IDOR) 취약점을 원천 해결하고 타인 간의 거래를 임의로 폭파시키는 위협을 완전히 종식함.
-- 시장 데이터 로드 단계부터 좀비 거래를 철저히 정화하여 쿼리 효율성과 사용자 경험의 쾌적함을 획기적으로 확보함.
+- 교역 거절 API에 인가 가드를 삽입함으로써 Broken Access Control(IDOR) 취약점을 해결하고 타인 간의 거래를 임의로 폭파시키는 위협을 정리함.
+- 시장 데이터 로드 단계부터 좀비 거래를 정리하여 쿼리 효율성과 사용자 경험의 쾌적함을 크게 유지함.
 
 ---
 
@@ -562,15 +562,15 @@
 
 ### 배경
 - **[STATE-F029] AP Duplication (Lost Update)**:
-  - `consume_turn()` 실행 시 플레이어의 AP가 부족하면 슬로우 패스(Slow-path)가 기동됨. 이 경로에서는 턴 쿼터 차감 후 `process_turn()`에서 AP를 10(`GameConfig.ACTION_POINTS_PER_TURN`)으로 완전히 리셋하고 `db.session.commit()`을 수행해 락을 해제함.
+  - `consume_turn()` 실행 시 플레이어의 AP가 부족하면 슬로우 패스(Slow-path)가 기동됨. 이 경로에서는 턴 쿼터 차감 후 `process_turn()`에서 AP를 10(`GameConfig.ACTION_POINTS_PER_TURN`)으로 재설정하고 `db.session.commit()`을 수행해 락을 해제함.
   - 그 직후 `_sync_npc_turns(park)`가 연동되는데, 이 과정에서 모든 NPC 공원에 순차적 비관적 락을 걸고 턴을 진행 및 커밋하므로 상당한 런타임 지연(Gap)이 발생함.
-  - 플레이어의 락이 해제되어 있는 이 틈새 동안 유저가 concurrent HTTP requests(예: 채집)를 기동하면, AP가 이미 리셋되어 있으므로 패스트 패스(Fast-path) 조건(`action_points >= ap_cost`)을 완벽히 충족해 원자적으로 AP를 안전히 차감하고 커밋 처리함.
-  - 그러나, `_sync_npc_turns` 수행을 끝내고 돌아온 슬로우 패스 스레드가 메모리 상의 Stale AP 상태(예: 10)를 기준으로 최종 AP 감산(`park.action_points -= ap_cost`)을 수행해 DB에 덮어씀(`db.session.commit()`)으로써 중간에 패스트 패스가 적법하게 소모한 AP 기록을 완전히 지워버려(Lost Update) AP가 무상 복제/우회되는 심각한 논리적 취약점이 발생함.
+  - 플레이어의 락이 해제되어 있는 이 틈새 동안 유저가 concurrent HTTP requests(예: 채집)를 기동하면, AP가 이미 리셋되어 있으므로 패스트 패스(Fast-path) 조건(`action_points >= ap_cost`)을 정밀하게 충족해 원자적으로 AP를 안전히 차감하고 커밋 처리함.
+  - 그러나, `_sync_npc_turns` 수행을 끝내고 돌아온 슬로우 패스 스레드가 메모리 상의 Stale AP 상태(예: 10)를 기준으로 최종 AP 감산(`park.action_points -= ap_cost`)을 수행해 DB에 덮어씀(`db.session.commit()`)으로써 중간에 패스트 패스가 적법하게 소모한 AP 기록을 상당히 지워버려(Lost Update) AP가 무상 복제/우회되는 심각한 논리적 취약점이 발생함.
 
 ### 결정
 - **AP 감산 및 재검증 직전의 플레이어 공원 2차 비관적 락 및 리프레시 강제**:
   - `_sync_npc_turns` 호출이 완료된 직후이자 최종 AP 감산을 실행하기 직전에 플레이어 공원 객체에 대해 다시 한 번 `with_for_update()`를 획득하고 `db.session.refresh(park)`를 호출하도록 아키텍처를 보강함.
-  - 이를 통해 락 프리 상태의 틈새 동안 concurrent 요청들에 의해 DB에 안전하게 감산되어 있는 최신 AP 값과 공원 상태를 메모리에 강제로 동기화하여 Stale Overwrite를 물리적으로 원천 차단함.
+  - 이를 통해 락 프리 상태의 틈새 동안 concurrent 요청들에 의해 DB에 안전하게 감산되어 있는 최신 AP 값과 공원 상태를 메모리에 강제로 동기화하여 Stale Overwrite를 물리적으로 차단함.
   - 동기화된 최신 AP를 기준으로 `if park.action_points < ap_cost` 재검증 및 연산을 수행한 뒤 커밋하여 데이터 정합성 무결성을 달성함.
 
 ### 대안과 기각 사유
@@ -580,7 +580,7 @@
 | AP 감산을 원자적 벌크 UPDATE 문으로만 수행 | AP 감산은 가능하지만, 행동 시작 전 플레이어의 실제 AP 부족 여부를 검증하는 세션 런타임의 가상 객체 상태(`park.action_points`)가 Stale 상태로 잔존하여 후속 라우트 내부 로직에서 판단 오염을 방출할 수 있음 |
 
 ### 결과
-- 턴 진행 및 NPC 동기 턴 처리라는 장시간의 무락(Lock-free Gap) 런타임 간극 속에서도 concurrent 다중 요청의 AP 소모 정합성을 100% 무결하게 보호하고 AP 복제 Exploit을 완전히 차단함.
+- 턴 진행 및 NPC 동기 턴 처리라는 장시간의 무락(Lock-free Gap) 런타임 간극 속에서도 concurrent 다중 요청의 AP 소모 정합성을 설계적으로 상당한 보호하고 AP 복제 Exploit을 높은 수준으로 차단함 (회귀 테스트 범위 내 검증).
 - 2차 비관적 락 및 refresh 동기화 패턴을 통해 성능 희생(락 시간 최소화)과 데이터 무결성을 동시 달성함.
 
 ---
@@ -599,10 +599,10 @@
 | 대안 | 기각 사유 |
 |------|----------|
 | 내부 공격 시 flush 제거 | execute_battle 진입 전 DB에 dirty state가 반영되지 않아 락 정렬 순서가 꼬이고 TOCTOU 데드락이 발생함 |
-| 롤백 가드 생략 | nested 롤백 실패 시 SQLAlchemy 세션이 완전히 FAILED 상태로 고정되어 후속 유저 요청에 지속적으로 PendingRollbackError를 내뿜음 |
+| 롤백 가드 생략 | nested 롤백 실패 시 SQLAlchemy 세션이 상당히 FAILED 상태로 고정되어 후속 유저 요청에 지속적으로 PendingRollbackError를 내뿜음 |
 
 ### 결과
-- `ResourceClosedError`가 완치되고 NPC AI가 턴 롤백 시 부모 트랜잭션을 안전하게 복구하여 턴 무한 반복 및 락 오동작을 영구 차단했습니다.
+- `ResourceClosedError`가 완화되고 NPC AI가 턴 롤백 시 부모 트랜잭션을 안전하게 복구하여 턴 무한 반복 및 락 오동작을 설계적으로 확실히 방지했습니다.
 
 ---
 
@@ -620,7 +620,7 @@
 | refund_ap 헬퍼 내부에서 commit 수행 | 트랜잭션 경계를 라우터 레벨에서 통제하는 현 아키텍처 기조를 해치며, 복잡한 비즈니스 묶음 연산 도중 환불 발생 시 강제 커밋이 기동되어 부분 원자성을 훼손함 |
 
 ### 결과
-- 예외 상황에서도 환불된 AP 수치가 영구 보존되는 무결성을 확보했습니다.
+- 예외 상황에서도 환불된 AP 수치가 보존되는 정합성을 확보했습니다.
 
 ---
 
@@ -629,15 +629,15 @@
 ### 배경
 - **[Spy overcrowding Lost Update]**:
   - 밀사 임무 진행(`_process_spy_missions`)의 마지막 단계에서 밀사 복귀 등으로 인구가 수용 한도를 초과했을 때 인구를 솎아내기 위해 `_process_overcrowding(park)`을 호출합니다.
-  - 이때 비관적 락 없이 단순 `refresh(park)`만 호출하고 속성을 감산한 뒤 `commit()`을 기동함으로써, 락이 풀려있는 무락 갭(Lock-free Gap) 하에 concurrent하게 들어온 다른 유저의 채집/교역 수락 등의 DB 업데이트 이력을 구버전 Stale 메모리 데이터로 덮어써(Lost Update) 자원/유닛이 복사 및 소멸되는 버그가 발생할 수 있습니다.
+  - 이때 비관적 락 없이 단순 `refresh(park)`만 호출하고 속성을 감산한 뒤 `commit()`을 기동함으로써, 락이 풀려있는 무락 갭(Lock-free Gap) 하에 concurrent하게 들어온 다른 유저의 채집/교역 수락 등의 DB 업데이트 이력을 구버전 Stale 메모리 데이터로 덮어써(Lost Update) 자원/유닛이 복사 및 유실되는 버그가 발생할 수 있습니다.
 
 ### 결정
-- overcrowding 검사 진입 직전에 플레이어 공원에 대해 다시 한 번 `with_for_update()` 비관적 락을 획득하고 `db.session.refresh(park)`를 명시적으로 실행하여 Stale Overwrite를 원천 차단하도록 설계했습니다.
+- overcrowding 검사 진입 직전에 플레이어 공원에 대해 다시 한 번 `with_for_update()` 비관적 락을 획득하고 `db.session.refresh(park)`를 명시적으로 실행하여 Stale Overwrite를 차단하도록 설계했습니다.
 
 ### 대안과 기각 사유
 | 대안 | 기각 사유 |
 |------|----------|
-| 밀사 임무 진행 트랜잭션 내부에서 루프 도중 overcrowding을 즉시 처리 | 밀사 복귀가 완전히 종료되어 최종 성체실장이 공원에 누적된 상태가 아니므로 과밀도 연산이 불완전하게 수행되며, 루프 내부의 락 범위를 넓혀 교차 데드락 위험을 가중함 |
+| 밀사 임무 진행 트랜잭션 내부에서 루프 도중 overcrowding을 즉시 처리 | 밀사 복귀가 종료되어 최종 성체실장이 공원에 누적된 상태가 아니므로 과밀도 연산이 불전체하게 수행되며, 루프 내부의 락 범위를 넓혀 교차 데드락 위험을 가중함 |
 
 ### 결과
 - overcrowding 처리 완료 후 최종 인구 정화 시점에서도 concurrent 다중 요청과의 데이터 정합성을 안전하게 보호하고 Lost Update를 차단했습니다.
@@ -647,22 +647,22 @@
 ## 27. NPC 공격 시 락 순서 역전 교착 상태(Deadlock) 방지를 위한 최상단 비관적 락 해제 설계 (v1.8.9)
 
 ### 배경
-- `process_npc_turn()` 최상단에서 대상 NPC 공원에 무조건적으로 비관적 락(`with_for_update().first()`)을 선점 획득하고 트랜잭션이 완전히 커밋될 때까지 들고 있었습니다.
+  - `process_npc_turn()` 최상단에서 대상 NPC 공원에 비관적 락(`with_for_update().first()`)을 선점 획득하고 트랜잭션이 커밋될 때까지 들고 있었습니다.
 - NPC가 공격 성향을 띠고 `_npc_attack`을 통해 다른 공원을 공격하려 하면 `execute_battle()`이 기동되어 데드락 방지용 ID 오름차순(Canonical Ordering) 락킹(`Park.query.filter(Park.id.in_(lock_ids)).with_for_update().all()`)을 시도합니다.
 - 이때 공격자(NPC)의 ID가 방어자(Player)의 ID보다 크면(`Player.id < NPC.id`), 정렬 순서는 `[Player, NPC]`가 되지만 NPC 스레드는 **이미 NPC.id 락을 쥔 채**로 Player 락을 대기하게 됩니다. (즉 `NPC -> Player` 순서로 대기)
-- 동시에 Player가 NPC를 공격하는 등의 트랜잭션이 작동하여 `Player -> NPC` 순서로 정렬 락을 얻으려 하면, 서로가 서로의 락 해제를 영구히 기다리는 **락 순서 역전 교착 상태(Lock Order Inversion Deadlock) [DEADLOCK-F005]**가 발생하여 DB 커넥션 풀이 완전 고사하고 서비스 장애가 유발되었습니다.
+- 동시에 Player가 NPC를 공격하는 등의 트랜잭션이 작동하여 `Player -> NPC` 순서로 정렬 락을 얻으려 하면, 서로가 서로의 락 해제를 지속적으로 기다리는 **락 순서 역전 교착 상태(Lock Order Inversion Deadlock) [DEADLOCK-F005]**가 발생하여 DB 커넥션 풀이 고사하고 서비스 장애가 유발되었습니다.
 
 ### 결정
-- `_sync_npc_turns()` 레벨에서 NPC 기본 턴 처리(`process_turn`) 완료 즉시 명시적인 `db.session.commit()`을 수행하여 선점 락을 완전히 해제(소멸)한 뒤, 독립된 트랜잭션 경계 하에 `process_npc_turn()`을 구동하는 **2단계 트랜잭션 경계 분리 구조**를 채택했습니다. 또한 `process_npc_turn()` 최상단에서의 무조건적 락 선점을 배제하여, 전투(`execute_battle()`) 등 개별 행동 단위로만 필요한 락을 안전한 ID 오름차순(Canonical Ordering) 순서대로 획득하도록 통제를 완화하였습니다.
+  - `_sync_npc_turns()` 레벨에서 NPC 기본 턴 처리(`process_turn`) 완료 즉시 명시적인 `db.session.commit()`을 수행하여 선점 락을 해제한 뒤, 독립된 트랜잭션 경계 하에 `process_npc_turn()`을 구동하는 **2단계 트랜잭션 경계 분리 구조**를 채택했습니다. 또한 `process_npc_turn()` 최상단에서의 무조건적 락 선점을 배제하여, 전투(`execute_battle()`) 등 개별 행동 단위로만 필요한 락을 안전한 ID 오름차순(Canonical Ordering) 순서대로 획득하도록 조정하였습니다.
 
 ### 대안과 기각 사유
 | 대안 | 기각 사유 / 수용 여부 |
 |------|-----------------------|
 | [v1.8.9 수용] NPC 턴 진행 및 AI 행동 2단계 트랜잭션 분리 | 2단계 트랜잭션 분리에 의한 미세 무락 갭(Lock-free Gap)이 수반되나, 이는 SQLite WAL pragma 활성화 및 다중 프로세스(Gunicorn) 환경의 RDBMS 이주 호환성(Canonical Order Lock)으로 안전하게 극복할 수 있어 **최종 채택 및 수용**하였습니다. |
-| execute_battle 실행 전 락 전체 임시 해제 후 재획득 | SQLAlchemy 세션 및 트랜잭션 범위 상 중간 락 강제 해제가 불완전하며, 복잡한 비즈니스 롤백 로직의 일관성을 크게 해쳐 기각함 |
+| execute_battle 실행 전 락 전체 임시 해제 후 재획득 | SQLAlchemy 세션 및 트랜잭션 범위 상 중간 락 강제 해제가 불전체하며, 복잡한 비즈니스 롤백 로직의 일관성을 크게 해쳐 기각함 |
 
 ### 결과
-- 락 선점으로 인한 락 순서 역전 데드락 결함`[DEADLOCK-F005]`이 완전 종식되었으며, NPC 침공 시의 DB 커넥션 고갈 위협을 완전히 소멸시키고 안정적인 2단계 트랜잭션 롤백 무결성을 확보했습니다.
+  - 락 선점으로 인한 락 순서 역전 데드락 결함`[DEADLOCK-F005]`을 완화하였으며, NPC 침공 시의 DB 커넥션 고갈 위협을 낮추고 2단계 트랜잭션 롤백 정합성을 유지했습니다.
 
 ---
 

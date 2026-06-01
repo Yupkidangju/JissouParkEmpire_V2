@@ -14,7 +14,7 @@ git clone <your-repo-url>
 cd JissouParkEmpire
 
 # 가상환경 생성 및 활성화
-python -m venv venv
+python3 -m venv venv
 # Windows
 venv\Scripts\activate
 # Linux/macOS
@@ -24,7 +24,7 @@ source venv/bin/activate
 pip install -r requirements.txt
 
 # 가상환경(venv) 활성화 상태에서 서버 실행
-python run.py
+python3 run.py
 
 # 또는 가상환경 외부에서 직접 절대경로로 실행
 venv/bin/python run.py
@@ -123,10 +123,10 @@ sudo systemctl start jissou-park
 sudo systemctl status jissou-park
 ```
 
-#### Gunicorn에 맞게 run.py 수정 필요
+#### Gunicorn 실행 시 run.py 노출 확인
 
 ```python
-# run.py 끝에 추가 (Gunicorn이 app 객체를 인식하도록)
+# run.py에는 이미 app = create_app()가 존재하므로 추가 수정은 필요하지 않습니다.
 app = create_app()
 ```
 
@@ -311,3 +311,26 @@ sudo lsof -i :80
 | 타겟 | 일본/중국/한국 실장석 팬층 |
 | 개발 기간 | 1~2주 (UI 재작성) |
 
+
+## 수동 품질 게이트 및 자가 진단 운영 지침 (CI 부재 보완)
+
+본 프로젝트는 경량형 환경 및 로컬 실행의 이점을 극대화하기 위해 원격 CI/CD 파이프라인을 의도적으로 적용하지 않고, **강력한 수동 품질 게이트(Manual Quality Gate) 및 자가 진단 절차**를 운영 표준으로 삼습니다. 모든 코드를 원격 저장소(`master` 브랜치)에 머지 또는 푸시하기 전, 개발자는 아래의 프로세스를 수동으로 집행하고 검증을 완수해야 합니다.
+
+### 1. 수동 검증 프로세스 및 명령 목록
+
+개발자는 변경 사항을 원격 master 저장소에 반영하기 직전, 아래 명령 스위트를 clean 터미널 환경에서 반드시 순차적으로 실행하여 모두 성공(`exit 0`)해야 합니다.
+
+| 단계 | 수행 명령 | 목적 및 검증 대상 |
+|---|---|---|
+| **1. 단위 및 회귀 테스트** | `venv/bin/python -m pytest -q -W error` | pytest 테스트 전원 그린 패스 및 경고의 에러 격상 검증 |
+| **2. 화이트스페이스 검사** | `git diff --check` | 작업 트리 상의 불필요한 공백문자 및 빈 라인 누출 차단 |
+| **3. 캐시 공백 검사** | `git diff --cached --check` | index(Staged)에 등록된 커밋 대상 파일의 공백 검증 |
+| **4. 문법 정적 분석** | `venv/bin/python -m py_compile app/*.py run.py tests/*.py` | 파이썬 소스 코드의 AST 문법 정합성 분석 |
+
+### 2. 운영 책임자 및 실행 주기
+
+- **운영 책임 총괄**: Project Lead Architect / Eunho Lim (이은호)
+- **실행 주기**:
+  - **매 커밋(Commit) 전**: `git diff --check` 및 `git diff --cached --check`를 상시 실행하여 형상 관리 규격을 유지합니다.
+  - **매 원격 푸시(Push) 및 이주(Migration) 전**: `venv/bin/python -m pytest -q -W error`를 필수 가동하여 모든 비즈니스 로직 및 동시성 락, XSS 보안 회귀 테스트 통과를 강제합니다.
+  - **정기 품질 감사**: 2주 단위로 프로젝트 총괄 책임자의 검토 하에 전체 로컬 수동 품질 게이트를 일괄 점검 및 아카이빙합니다.

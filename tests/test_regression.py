@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 실장석 공원 제국 - 회귀 테스트 코드 (test_regression.py)
-[v1.8.9] Critical 동시성, 세이브포인트 플러시, 데드락 완치 검증용 회귀 테스트 (audit_report_63.md [DBG-F002] 및 audit_report_65.md [DBG-F003]/[DBG-F002])
+[v1.8.9] Critical 동시성, 세이브포인트 플러시, 데드락 고도 예방 검증용 회귀 테스트 (audit_report_63.md [DBG-F002] 및 audit_report_65.md [DBG-F003]/[DBG-F002])
 - Node.js 기반 실질적 프론트엔드 XSS 이스케이프 검증 및 2중 SQLAlchemy 세션 기반 SQLite Lost Update 동시성 경쟁 검증 포함.
 - 모든 주석은 엄격하게 한국어로만 기술됩니다.
 """
@@ -91,7 +91,7 @@ def test_audit_report_59_spy_overcrowding_lock(app):
         db.session.commit()
 
         # 실제 밀사 임무 및 overcrowding 처리 함수 직접 기동
-        # 내부적으로 2차 비관적 락과 db.session.refresh가 완벽하게 맞물려 에러 없이
+        # 내부적으로 2차 비관적 락과 db.session.refresh가 설계대로 정밀하게 맞물려 에러 없이
         # 최신 정보를 기반으로 정상 정화(adult_count 정화)를 이행하는지 검증합니다.
         _process_spy_missions(player_park)
         db.session.commit()
@@ -104,9 +104,9 @@ def test_audit_report_59_spy_overcrowding_lock(app):
 def test_audit_report_61_npc_attack_lock_order(app):
     """
     [audit_report_61.md 및 62.md/63.md 회귀 검증]
-    _sync_npc_turns() 진행 중 process_turn() 완료 직후 commit을 집행하여 선점 락을 완전히 해제하고,
+    _sync_npc_turns() 진행 중 process_turn() 완료 직후 commit을 집행하여 선점 락을 고도로 해제하고,
     그 다음 깨끗하게 락이 비워진 상태에서 process_npc_turn()의 공격 경로(execute_battle)에 진입하여
-    락 순서 역전 교착 상태(DEADLOCK-F005)를 완치 및 차단하는 호출 흐름을 검증합니다.
+    락 순서 역전 교착 상태(DEADLOCK-F005)를 고도 예방하는 호출 흐름을 검증합니다.
     또한, execute_battle()이 실질적으로 결투를 완수하여 AP 차감 및 전투 로그 생성 등 상태 변경을 달성했는지 결정적으로 검증합니다.
     """
     from app.models import BattleLog
@@ -153,15 +153,15 @@ def test_audit_report_61_npc_attack_lock_order(app):
         initial_log_count = BattleLog.query.count()
 
         # 실제 _sync_npc_turns()를 호출하여 플레이어와 동기화
-        # _sync_npc_turns 내부에서 1단계 process_turn -> commit -> 2단계 process_npc_turn 흐름이 완벽히 작동하는지 실질적으로 검증합니다.
+        # _sync_npc_turns 내부에서 1단계 process_turn -> commit -> 2단계 process_npc_turn 흐름이 정상 동작하는지 실질적으로 검증합니다.
         _sync_npc_turns(player_park)
 
         # 턴 동기화 성공 여부 검증
         db.session.refresh(npc_park)
         assert npc_park.turn_count == 1
 
-        # [v1.8.9 고도화] 실제 execute_battle()이 NPC 공격 동작 중 성공적으로 기동되었는지 증명
-        # 1. 턴 스케줄러를 통과하면서 NPC의 action_points가 3 -> (gather로 1 소모) 2 -> (attack으로 2 소모) 0으로 완전히 소진되었는지 확인
+        # [v1.8.9 고도화] 실제 execute_battle()이 NPC 공격 동작 중 정상 기동되었는지 확인
+        # 1. 턴 스케줄러를 통과하면서 NPC의 action_points가 3 -> (gather로 1 소모) 2 -> (attack으로 2 소모) 0으로 감소했는지 확인
         assert npc_park.action_points == 0
 
         # 2. BattleLog가 성공적으로 생성되었는지 확인
@@ -177,14 +177,14 @@ def test_audit_report_61_npc_attack_lock_order(app):
 def test_xss_escape_html(client):
     """
     [SEC-F002 XSS 헬퍼 교차 검증 및 정적 innerHTML 안전성 스캔 회귀 테스트]
-    악성 HTML/XSS 스크립트 문자열이 사용자 가입 시 철저히 차단되거나,
-    백엔드 렌더링 시 html.escape를 통해 온전히 이스케이프 처리되는지 확인합니다.
+    악성 HTML/XSS 스크립트 문자열이 사용자 가입 시 차단되거나,
+    백엔드 렌더링 시 html.escape를 통해 이스케이프 처리되는지 확인합니다.
     또한 static/js/game.js의 escapeHtml() 헬퍼 함수가 실제 static JS 리소스로부터
     정규식으로 추출된 소스코드로서 Node.js 런타임을 통해 교차 기동 및 검증되는지 정적/결합 수준에서 실증합니다.
     """
     # 1. 특수문자 및 악성 스크립트 공원명/유저명 가입 가드 검증
     # [v1.8.9 고도화] 실제 auth_routes.py에서 사용하는 폼 필드인 'password2'를 정상 전송하여
-    # 비밀번호 불일치 예외 분기로 빠지지 않고 실제 위험 문자 차단 가드 분기까지 완벽히 도달시킵니다.
+    # 비밀번호 불일치 예외 분기로 빠지지 않고 실제 위험 문자 차단 가드 분기까지 도달시킵니다.
     response = client.post('/register', data={
         'username': 'xss_user',
         'password': 'password123',
@@ -259,7 +259,7 @@ console.log(escapeHtml({repr(malicious_js_input)}));
     )
     escaped_js_from_node = node_process.stdout.strip()
 
-    # 최종 검증: Node.js를 통해 실제 game.js가 처리한 XSS 이스케이프 문자열이 파이썬 모방 검증 결과와 완전히(100%) 동일해야 함
+    # 최종 검증: Node.js를 통해 실제 game.js가 처리한 XSS 이스케이프 문자열이 파이썬 모방 검증 결과와 일치해야 함
     assert escaped_js_from_node == escaped_js
     assert "<script>" not in escaped_js_from_node
     assert "&lt;script&gt;" in escaped_js_from_node
@@ -272,7 +272,7 @@ def test_sqlite_lost_update_race_condition(app):
     두 개의 독립 세션(Session A, Session B)을 통해 동일한 Park 데이터를 stale read한 상태에서
     stale write-back(Lost Update) 위협이 발생할 때,
     실제 게임 엔진 함수인 _process_spy_missions() 내부의 db.session.refresh() 논리가
-    stale data를 완벽히 새로고침하여 최종 일관성(Consistent State)을 회복하는지 실질적 구현 경로를 통해 검증합니다.
+    stale data를 정밀하게 새로고침하여 최종 일관성(Consistent State)을 회복하는지 실질적 구현 경로를 통해 검증합니다.
     [변별력 설계 (Mutation-Sensitive)]:
     - 초기 상태: adult_count = 14, population_cap = 15 (수용량 이하 상태)
     - Session A: adult_count = 25 로 변경하고 commit
@@ -394,15 +394,11 @@ def test_static_js_inner_html_xss_protection():
             assert "escapeHtml(" in value_stripped or "parseInt(" in value_stripped or "parseFloat(" in value_stripped, \
                 f"XSS 취약점 검출! game.js의 innerHTML 동적 대입 중 안전 가드(escapeHtml) 누락: {value_stripped}"
 
-    # 2. [v1.8.9 고도화] game.js 내의 모든 innerHTML 관련 백틱(`...`) 템플릿 리터럴 전수 조사 (html builder 및 누적 += 보간 포함)
-    # 실제 innerHTML 대입문 혹은 데이터 빌더가 밀집된 try 블록(98~137라인) 및 attack-title 대입라인(153라인)만 추출하여 검사합니다.
-    lines = js_content.splitlines()
-    scout_block = "\n".join(lines[97:137])  # 98라인부터 137라인까지
-    attack_line = lines[152]  # 153라인
-    target_js_block = scout_block + "\n" + attack_line
-
-    # 해당 융합형 HTML 빌더 블록 내부의 모든 백틱 템플릿 리터럴을 쿼리
-    template_literals = re.findall(r'`(.*?)(?<!\\)`', target_js_block, re.DOTALL)
+    # 2. [v1.8.9 고도화] game.js 내의 모든 innerHTML 및 HTML 빌더 관련 백틱(`...`) 템플릿 리터럴 전수 조사
+    # 특정 라인 슬라이스 의존성을 제거하여 파일 구조 변경에도 견고하게 작동하도록 전사적 정적 분석을 수행합니다.
+    # innerHTML 대입 혹은 html 변수(HTML builder) 누적에 사용되는 백틱 블록만 추출하여 confirm 등 텍스트 확인창의 오탐을 배제합니다.
+    template_matches = re.findall(r'(\bhtml\s*\+?=\s*`|innerHTML\s*=\s*`)(.*?)(?<!\\)`', js_content, re.DOTALL)
+    template_literals = [match[1] for match in template_matches]
     for template in template_literals:
         # 템플릿 자체가 API URL 형식(/...)이면 스킵하여 오탐지 방지
         template_stripped = template.strip()
@@ -412,7 +408,7 @@ def test_static_js_inner_html_xss_protection():
         interpolations = re.findall(r'\$\{(.*?)\}', template)
         for item in interpolations:
             item_stripped = item.strip()
-            # [v1.9.0] 단순 문자열 포함 여부 매칭의 사각지대(예: escapeHtml 누설 mixed expression)를 완치하기 위해
+            # [v1.9.0] 단순 문자열 포함 여부 매칭의 사각지대(예: escapeHtml 누설 mixed expression)를 고도 예방하기 위해
             # 전체 표현식이 단일 safe token인지 여부를 판단하는 구조로 스캔 로직을 고도화합니다.
             is_safe = False
             if "escapeHtml(" in item_stripped or "parseInt(" in item_stripped or "parseFloat(" in item_stripped:

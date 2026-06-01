@@ -291,7 +291,7 @@ def before_spy_delete(mapper, connection, target):
 ### 5.12 NPC 개별 트랜잭션 격리 및 Savepoint(Nested) 예외 가드 (v1.8.6)
 - **일괄 처리 트랜잭션의 루프 개별 격리**:
   - `_sync_npc_turns`에서 모든 NPC를 한 번에 조회하여 락을 얻는 기존 방식은 루프 내부의 `db.session.commit()`이 실행될 때 아직 처리되지 않은 다른 NPC들의 락도 해제되는 아키텍처적 결함이 있었습니다.
-  - 이를 해결하기 위해 루프 외부에서는 단지 정렬된 NPC ID 목록만 추출하고, 루프 내부에서 개별적으로 `with_for_update().first()`를 다시 쿼리하고 독립된 `commit()`을 기동하여 개별 트랜잭션 단위로 완전히 격리되도록 구현했습니다.
+  - 이를 해결하기 위해 루프 외부에서는 단지 정렬된 NPC ID 목록만 추출하고, 루프 내부에서 개별적으로 `with_for_update().first()`를 다시 쿼리하고 독립된 `commit()`을 기동하여 개별 트랜잭션 단위로 격리되도록 구현했습니다.
 - **Nested Transaction (Savepoint)을 통한 비관적 락 보존**:
   - NPC 행동 도중 발생한 예외가 전체 트랜잭션을 롤백하게 되면 락이 유실되고 턴 진행 내역마저 소실되어 무한 스탬피드 버그를 일으켰습니다.
   - 이를 방어하고자 루프 내부의 각 행동 단계마다 `db.session.begin_nested()` 세이브포인트를 생성하여, 예외 발생 시 오직 실패한 그 행동의 상태만 롤백하고 부모 트랜잭션과 비관적 락은 안전하게 보존하도록 조치했습니다.
@@ -301,7 +301,7 @@ def before_spy_delete(mapper, connection, target):
 ### 5.13 교역 보안 및 좀비 거래 정화 구현 요약 (v1.8.7)
 - **교역 거절 IDOR 인가(Authorization) 가드 강제**:
   - `trade_reject(trade_id)` API의 원자적 UPDATE 조건식에 `TradeOffer.receiver_id == park.id` 가드 필터를 탑재하였습니다.
-  - 이를 통해 비공개 교역 제안을 받은 당사자(수신자)만이 해당 거래를 거절할 수 있도록 강제하여, 제3자가 거래 ID 변조를 통해 타인의 거래를 임의로 폭파(DoS)시키는 Insecure Direct Object Reference 취약점을 원천 차단했습니다.
+    - 이를 통해 비공개 교역 제안을 받은 당사자(수신자)만이 해당 거래를 거절할 수 있도록 제한하여, 제3자가 거래 ID 변조를 통해 타인의 거래를 임의로 폭파(DoS)시키는 Insecure Direct Object Reference 취약점을 방지했습니다.
 - **시장 좀비 거래(Zombie Trades) 선제 정화 조인 필터링**:
   - `trade_market()` 공개 시장 조회 쿼리에 `Park` 모델을 JOIN하고 `Park.is_destroyed == False` 필터를 가드로 강제 탑재하였습니다.
   - 멸망한 발송자(Sender)의 대기 교역 제안이 공개 시장에 계속 노출되어 사용자 경험을 저해하고 수락 시점의 비관적 락 및 TOCTOU 만료 검증 단계에서 불필요한 트랜잭션 경합을 유발하던 현상을 데이터베이스 쿼리 레벨에서 선제 정화하였습니다.
@@ -310,7 +310,7 @@ def before_spy_delete(mapper, connection, target):
 - **턴 동기화 락 프리 갭(Lock-free Gap) 보안 결함 해결**:
   - 플레이어의 AP가 부족해 슬로우 패스가 수행되면 턴 진행 후 AP가 10으로 강제 충전되며 플레이어 락이 일단 커밋/해제됩니다.
   - 이후 `_sync_npc_turns()`를 통해 모든 NPC의 턴 진행 연산이 순차적으로 실행되는 동안 플레이어 공원의 락은 해제된 상태(Lock-free Gap)로 노출됩니다.
-  - 이 지연 갭 동안 concurrent 다중 요청(패스트 패스)이 AP를 안전하게 선차감하고 커밋 완료하더라도, 원래의 슬로우 패스 스레드가 메모리 상의 Stale AP(10)를 기준으로 최종 AP 차감 연산(`park.action_points -= ap_cost`)을 덮어씀으로써 concurrent 요청의 AP 소모 이력을 지워버려(Lost Update) AP가 무상으로 복제되는 취약점을 수정하였습니다.
+    - 이 지연 갭 동안 concurrent 다중 요청(패스트 패스)이 AP를 안전하게 선차감하고 커밋 완료하더라도, 원래의 슬로우 패스 스레드가 메모리 상의 Stale AP(10)를 기준으로 최종 AP 차감 연산(`park.action_points -= ap_cost`)을 덮어씀으로써 concurrent 요청의 AP 소모 이력을 지워버려(Lost Update) AP가 중복 반영될 수 있는 취약점을 수정하였습니다.
 - **최종 AP 감산 직전 2차 비관적 락 및 refresh 동기화 구현**:
   - `_sync_npc_turns()` 수행이 종료된 즉시이자 최종 AP 감산 연산 기동 직전에 플레이어 공원 레코드에 대해 다시 한 번 `with_for_update()` 비관적 락을 획득하고 `db.session.refresh(park)`를 명시적으로 실행하도록 구현했습니다.
   - 이를 통해 락 프리 상태의 틈새 런타임 동안 다른 비동기 요청(패스트 패스)들에 의해 차감되어 있는 최신 AP 값을 DB로부터 강제로 리프레시하여 세션 메모리에 동기화하였습니다.
@@ -318,36 +318,36 @@ def before_spy_delete(mapper, connection, target):
 
 ### 5.15 NPC 중첩 플러시 2차 예외 통제 구현 요약 (v1.8.9)
 - **공격 함수 내부 DB 커밋의 플러시 전환을 통한 세이브포인트 보존**:
-  - NPC 행동 도중 `_npc_attack` 및 `_npc_cunning_attack` 내부에서 `db.session.commit()`이 기동되어 세이브포인트가 영구 종결되고 세션이 파괴되어 `ResourceClosedError`를 유발하던 아키텍처적 결함을 수정했습니다.
+    - NPC 행동 도중 `_npc_attack` 및 `_npc_cunning_attack` 내부에서 `db.session.commit()`이 기동되어 세이브포인트가 종료되고 세션이 파괴되어 `ResourceClosedError`를 유발하던 아키텍처적 결함을 수정했습니다.
   - 이를 방어하고자 내부 공격 연산 시 `commit()` 대신 `db.session.flush()`를 적용하여, 트랜잭션 세이브포인트를 깨뜨리지 않고 메모리 변경 정보만 SQL 쿼리로 DB에 방출되도록 개선했습니다.
 - **Savepoint 롤백 실패 시 부모 세션 2차 예외 복구 구축**:
   - `process_npc_turn` 예외 처리부에서 `nested.rollback()` 실패 시 상위 NPC 루프가 폭사하는 2차 위험을 차단하기 위해, nested 롤백 예외 발생 시 `db.session.rollback()`을 호출하는 **2차 롤백 예외 방어 가드**를 마련했습니다.
 
 ### 5.16 AP 환불 블랙홀 차단 및 라우터 레벨 명시적 커밋 구현 요약 (v1.8.9)
-- **환불 복구 데이터 롤백 유실(AP Blackhole) 원천 봉쇄**:
-  - `game_engine.refund_ap()` 호출 시 UPDATE 문이 세션에만 반영되고, 이후 라우터 내부에서 예외 분기나 멸망 분기를 만날 때 `db.session.commit()` 없이 HTTP 리다이렉트가 일어나 데이터베이스 트랜잭션 teardown 시점에 소리소문없이 AP 환불 데이터가 롤백 유실되던 치명적인 결함을 해결했습니다.
+- **환불 복구 데이터 롤백 유실(AP Blackhole) 방지**:
+    - `game_engine.refund_ap()` 호출 시 UPDATE 문이 세션에만 반영되고, 이후 라우터 내부에서 예외 분기나 멸망 분기를 만날 때 `db.session.commit()` 없이 HTTP 리다이렉트가 일어나 데이터베이스 트랜잭션 teardown 시점에 AP 환불 데이터가 롤백 유실되던 결함을 해결했습니다.
 - **예외 기각 분기 직후 라우터 레벨 명시적 커밋 강제**:
-  - `game_routes.py` 라우터 내의 모든 AP 환불 복구 분기(수집, 출산, 건설, 훈련, 공격 무산, 외교 멸망 TOCTOU, 이미 적대인 경우, IntegrityError 롤백 후, 밀사 파견 실패 등 총 8군데)에 대해 `refund_ap` 호출 즉시 `db.session.commit()`을 호출하도록 강제하여, AP가 롤백되지 않고 즉각적으로 영구 커밋되어 복구되도록 무결성을 달성했습니다.
+    - `game_routes.py` 라우터 내의 모든 AP 환불 복구 분기(수집, 출산, 건설, 훈련, 공격 무산, 외교 멸망 TOCTOU, 이미 적대인 경우, IntegrityError 롤백 후, 밀사 파견 실패 등 총 8군데)에 대해 `refund_ap` 호출 즉시 `db.session.commit()`을 호출하도록 적용하여, AP가 롤백되지 않고 즉시 복구되도록 정합성을 유지했습니다.
 
 ### 5.17 밀사 임무 처리 후 overcrowding 처리의 2차 비관적 락 가드 구현 (v1.8.9)
 - **밀사 복귀 인구 수용 한도 초과 처리의 Lost Update 예방**:
   - `_process_spy_missions`의 끝단에서 밀사 귀환 등으로 인한 수용 한도 초과를 연산하기 위해 `_process_overcrowding(park)`을 호출할 때, 비관적 락 없이 단순 `refresh` 및 메모리 변경 후 `commit`을 구동하여 concurrent 요청(채집/교역)에 의한 DB 상태 변경을 메모리 구버전 데이터로 덮어쓰던(Lost Update) 결함을 제거했습니다.
 - **인메모리 연산 직전의 2차 비관적 락 및 refresh 동기화 구현**:
-  - 과밀도 정화 처리 진입 직전에 플레이어 공원에 대해 다시 한 번 `with_for_update()` 비관적 락을 획득하고 `db.session.refresh(park)`를 명시적으로 실행하여, 데이터 덮어쓰기 레이스 컨디션을 완전히 차단하고 병렬 요청과의 데이터 정합성 무결성을 강제했습니다.
+    - 과밀도 정화 처리 진입 직전에 플레이어 공원에 대해 다시 한 번 `with_for_update()` 비관적 락을 획득하고 `db.session.refresh(park)`를 명시적으로 실행하여, 데이터 덮어쓰기 레이스 컨디션을 낮추고 병렬 요청과의 데이터 정합성을 유지했습니다.
 
-### 5.18 NPC 턴 진행 및 행동 AI 2단계 트랜잭션 경계 분리를 통한 교착 상태(Deadlock) 결함 [DEADLOCK-F005] 완치 요약 (v1.8.9)
+### 5.18 NPC 턴 진행 및 행동 AI 2단계 트랜잭션 경계 분리를 통한 교착 상태(Deadlock) 결함 [DEADLOCK-F005] 완화 요약 (v1.8.9)
 - **_sync_npc_turns()의 2단계 트랜잭션 경계 분리 도입**:
-  - 턴 동기화 스케줄러 실행 도중 NPC 기본 턴 처리(`process_turn`) 완료 즉시 명시적인 `db.session.commit()`을 수행하여 선점 락을 원천 소멸시킨 후, 깨끗하게 락이 비워진 상태에서 NPC AI 행동 의사결정 및 공격 기동(`process_npc_turn`)에 진입하는 **2단계 트랜잭션 경계 분리 구조**를 전격 도입했습니다.
+    - 턴 동기화 스케줄러 실행 도중 NPC 기본 턴 처리(`process_turn`) 완료 즉시 명시적인 `db.session.commit()`을 수행하여 선점 락을 해제한 후, 락이 비워진 상태에서 NPC AI 행동 의사결정 및 공격 기동(`process_npc_turn`)에 진입하는 **2단계 트랜잭션 경계 분리 구조**를 도입했습니다.
 - **NPC 행동 최상단 비관적 락(Pessimistic Lock) 완화 제거**:
-  - `process_npc_turn()` 시작 부분에서 무조건적으로 대상 NPC 공원 레코드를 `with_for_update()`로 락킹하던 구조를 완화하고 영구히 제거했으며, 이를 단순 `db.session.refresh(park)`만 호출하도록 수정하여 선점 락 현상을 원천 소멸시켰습니다.
-- **전투 행동 내 Canonical Locking을 통한 영구 교착 상태 강력 예방**:
-  - 기존에는 NPC 스레드가 이미 NPC 락을 선점 쥔 상태에서 `execute_battle()`을 호출하여 `Player`와 `NPC` 락을 오름차순으로 획득하려 하여, `Player.id < NPC.id`인 경우 영구적인 락 순서 역전 교착 상태(Deadlock)에 직면하였습니다.
-  - 2단계 분리 및 최상단 비관적 락 해제를 통해, NPC가 공격 기동 시 오직 `execute_battle()` 내부에서만 두 공원의 락을 Canonical Ordering(오름차순)으로 안전하게 동시 획득하여 교착 상태 `[DEADLOCK-F005]` 및 DB 커넥션 풀 고갈 결함 발생 위험을 강력히 예방했습니다.
+    - `process_npc_turn()` 시작 부분에서 무조건적으로 대상 NPC 공원 레코드를 `with_for_update()`로 락킹하던 구조를 단순화하고 제거했으며, 이를 `db.session.refresh(park)`만 호출하도록 수정하여 선점 락 현상을 낮췄습니다.
+- **전투 행동 내 Canonical Locking을 통한 교착 상태 위험 저감**:
+    - 기존에는 NPC 스레드가 이미 NPC 락을 선점 쥔 상태에서 `execute_battle()`을 호출하여 `Player`와 `NPC` 락을 오름차순으로 획득하려 하여, `Player.id < NPC.id`인 경우 지속적인 락 순서 역전 교착 상태(Deadlock)에 직면하였습니다.
+    - 2단계 분리 및 최상단 비관적 락 해제를 통해, NPC가 공격 기동 시 오직 `execute_battle()` 내부에서만 두 공원의 락을 Canonical Ordering(오름차순)으로 동시 획득하도록 정리하여 교착 상태 `[DEADLOCK-F005]` 및 DB 커넥션 풀 고갈 결함 발생 위험을 낮췄습니다.
 - **설계적 절충(Trade-off) 및 DB별 격리 보증 명문화**:
   - **Lock-free Gap 절충**: 이 2단계 분리 구조로 인해 NPC 행동 의사결정 및 전투 개시 직전에 발생하는 미세한 무락 갭(Lock-free Gap)은, NPC 행동 결정 시점에 플레이어의 자원 수치가 다소 변할 수 있으나 데드락 회피를 위해 감수한 의도된 설계적 절충(Trade-off)입니다.
-  - **SQLite WAL 및 busy_timeout pragma 실제 활성화**: 기본 배포 DB인 SQLite 환경에서 발생할 수 있는 no-op `with_for_update()` 제약을 극복하고 Database Locked 오류를 예방하기 위해, `Engine` 커넥션 이벤트 리스너를 수립하여 연결 즉시 `PRAGMA journal_mode=WAL` 및 `PRAGMA busy_timeout=5000` 설정을 데이터베이스 연결 시점에 강제 자동 주입하도록 완치했습니다.
+  - **SQLite WAL 및 busy_timeout pragma 실제 활성화**: 기본 배포 DB인 SQLite 환경에서 발생할 수 있는 no-op `with_for_update()` 제약을 극복하고 Database Locked 오류를 예방하기 위해, `Engine` 커넥션 이벤트 리스너를 수립하여 연결 즉시 `PRAGMA journal_mode=WAL` 및 `PRAGMA busy_timeout=5000` 설정을 데이터베이스 연결 시점에 강제 자동 주입하도록 보완했습니다.
   - **Row-Lock DB 프로덕션 이주 확장성**:
-    - 향후 Gunicorn 다중 워커 프로덕션 환경 하에 PostgreSQL/MySQL 등 실제 행 락 RDBMS로의 이주시에도, 소스 코드 변경 없이 높은 수준의 동시성 격리 무결성을 안전하게 확보하고 확장될 수 있도록 설계가 구성되었습니다. (단, E2E 및 실제 인스턴스 환경 하의 row-lock/deadlock 검증은 현재 Accepted Risk로 수용 상태이며 추후 실 DB 부하/교착 검증 스위트 통과 시 해소됩니다.)
+      - 향후 Gunicorn 다중 워커 프로덕션 환경 하에 PostgreSQL/MySQL 등 실제 행 락 RDBMS로의 이주시에도, 소스 코드 변경 없이 동시성 격리를 유지하고 확장될 수 있도록 설계가 구성되었습니다. (단, E2E 및 실제 인스턴스 환경 하의 row-lock/deadlock 검증은 현재 Accepted Risk로 수용 상태이며 추후 실 DB 부하/교착 검증 스위트 통과 시 해소됩니다.)
 
 ---
 
@@ -478,9 +478,9 @@ def before_spy_delete(mapper, connection, target):
 
 | 운영 조합 | 지원 여부 | 아키텍처 대응 및 완화 전략 |
 |-----------|-----------|---------------------------|
-| **SQLite + 단일 워커 (Single Worker)** | **공식 권장 (Supported)** | 개발 및 소형 호스팅에서 안정적으로 데이터 일관성(Consistency)이 보장됩니다. SQLite WAL 활성화 및 내부 sequential lock으로 동시 쓰기 정합성을 소화합니다. 다만 SQLite 환경에서 `with_for_update()`는 실제 DB 행 락(Row Lock)을 걸지 않는 무효(no-op) 상태이므로, Flask 개발 서버 구동 시 thread 1개와 단일 동시 쓰기 조건 하에서만 정합성이 온전히 유지됩니다. |
+| **SQLite + 단일 워커 (Single Worker)** | **공식 권장 (Supported)** | 개발 및 소형 호스팅에서 안정적으로 데이터 일관성(Consistency)을 유지합니다. SQLite WAL 활성화 및 내부 sequential lock으로 동시 쓰기 정합성을 소화합니다. 다만 SQLite 환경에서 `with_for_update()`는 실제 DB 행 락(Row Lock)을 걸지 않는 무효(no-op) 상태이므로, Flask 개발 서버 구동 시 thread 1개와 단일 동시 쓰기 조건 하에서만 정합성이 유지됩니다. |
 | **SQLite + 다중 워커 (Multi Worker)** | **제한 지원 (Accepted Risk / Limited)** | 다중 프로세스 환경의 동시 다발적 쓰기 요동 시, SQLite 고유의 파일 락 제약으로 인해 `Database Locked` (busy_timeout 초과) 리스크가 존재합니다. 이벤트 리스너를 통한 `PRAGMA busy_timeout=5000` 주입 및 2단계 트랜잭션 경계 분리로 병목을 줄이나, 부하 상황에서의 락 경합은 수용해야 할 한계(Accepted Risk)로 정의합니다. <br>※ **Accepted Risk 상세 규격**:<br>- **책임자(Owner)**: `Project Lead Architect / Eunho Lim`<br>- **수용 사유**: 초경량 zero-setup 및 호스팅 간소화를 위해 SQLite의 태생적 파일 락 제약 및 동시성 쓰기 경합 병목을 수용함.<br>- **운영 제한**: Gunicorn workers는 최대 2개로 제한하며, sync worker 모델 및 단일 thread(thread=1) 기동을 강제함.<br>- **만료 조건**: 동시 활성 유저(DAU) 100명 초과 또는 초당 평균 10회 이상의 DB 쓰기 요청 유발 시.<br>- **재검토 조건**: `Database Locked` (busy_timeout 초과) 에러가 주 3회 이상 감지되거나 동시성 레이스로 인한 유저 데이터 정합성 유실 사고 발생 시 PostgreSQL로의 즉각 강제 전환 프로파일 가동. |
-| **PostgreSQL/MySQL + 다중 워커** | **공식 프로덕션 대상 (Target Production / Accepted Risk)** | 상용 대규모 접속 및 배포의 대상 조합입니다. ORM 수준의 2중 ID 정렬(Canonical Order) `with_for_update()` 락 획득 설계를 구현해 두었기 때문에, 실제 RDBMS로 이주 시 네이티브 행 락(Row Lock)이 가동하여 교착 상태(Deadlock) 발생 위험을 고도로 예방한 동시 처리를 지원하도록 설계되었습니다. <br>※ **Accepted Risk 상세 규격 (PostgreSQL/MySQL 실 DB row-lock/deadlock 미검증)**:<br>- **책임자(Owner)**: `Project Lead Architect / Eunho Lim`<br>- **수용 사유**: 현재 개발/테스트 인프라 제약으로 인해 실제 PostgreSQL/MySQL 인스턴스를 통한 다중 worker 부하 및 row-lock/deadlock E2E 검증은 수행하지 않았으며, ID Canonical Ordering 설계적 안전성만을 확보한 상태에서 운영 위험을 잠재적으로 수용함.<br>- **만료 조건**: 프로덕션 DB로 실제 PostgreSQL/MySQL 이주 완료 및 해당 DB 상상 다중 스레드 부하 테스트/교착 검증 스위트를 최초로 수행 및 통과하는 시점.<br>- **재검토 조건**: 실제 RDBMS 프로덕션 이주 후 lock timeout 또는 deadlock 경보가 시스템 상에서 최초로 주 1회 이상 감지되는 시점. |
+| **PostgreSQL/MySQL + 다중 워커** | **공식 프로덕션 대상 (Target Production / Accepted Risk)** | 상용 대규모 접속 및 배포를 염두에 둔 조합입니다. ORM 수준의 2중 ID 정렬(Canonical Order) `with_for_update()` 락 획득 설계를 구현해 두었기 때문에, 실제 RDBMS로 이주 시 네이티브 행 락(Row Lock)이 가동하여 교착 상태(Deadlock) 발생 위험을 완화한 동시 처리를 지원하도록 설계되었습니다. <br>※ **Accepted Risk 상세 규격 (PostgreSQL/MySQL 실 DB row-lock/deadlock 미검증)**:<br>- **책임자(Owner)**: `Project Lead Architect / Eunho Lim`<br>- **수용 사유**: 현재 개발/테스트 인프라 제약으로 인해 실제 PostgreSQL/MySQL 인스턴스를 통한 다중 worker 부하 및 row-lock/deadlock E2E 검증은 수행하지 않았으며, ID Canonical Ordering 설계적 안전성만 확인한 상태에서 운영 위험을 제한적으로 수용함.<br>- **만료 조건**: 프로덕션 DB로 실제 PostgreSQL/MySQL 이주 완료 및 해당 DB 상상 다중 스레드 부하 테스트/교착 검증 스위트를 최초로 수행 및 통과하는 시점.<br>- **재검토 조건**: 실제 RDBMS 프로덕션 이주 후 lock timeout 또는 deadlock 경보가 시스템 상에서 최초로 주 1회 이상 감지되는 시점. |
 
 ---
 
@@ -493,6 +493,6 @@ def before_spy_delete(mapper, connection, target):
 
 ### 7.1 PostgreSQL/MySQL 실 DB row-lock/deadlock 미검증 (Accepted Risk)
 - **책임자(Owner)**: `Project Lead Architect / Eunho Lim`
-- **수용 사유**: 현재 개발/테스트 인프라 제약으로 인해 실제 PostgreSQL/MySQL 인스턴스를 통한 다중 worker 부하 및 row-lock/deadlock E2E 검증은 수행하지 않았으며, ID Canonical Ordering 설계적 안전성만을 확보한 상태에서 운영 위험을 잠재적으로 수용함.
+- **수용 사유**: 현재 개발/테스트 인프라 제약으로 인해 실제 PostgreSQL/MySQL 인스턴스를 통한 다중 worker 부하 및 row-lock/deadlock E2E 검증은 수행하지 않았으며, ID Canonical Ordering 설계적 안전성만 확인한 상태에서 운영 위험을 제한적으로 수용함.
 - **만료 조건**: 프로덕션 DB로 실제 PostgreSQL/MySQL 이주 완료 및 해당 DB 상에서 다중 스레드 부하 테스트/교착 검증 스위트를 최초로 수행 및 통과하는 시점.
 - **재검토 조건**: 실제 RDBMS 프로덕션 이주 후 lock timeout 또는 deadlock 경보가 시스템 상에서 최초로 주 1회 이상 감지되는 시점.
