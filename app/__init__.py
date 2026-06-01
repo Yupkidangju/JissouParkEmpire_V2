@@ -23,7 +23,7 @@ login_manager.login_message = '로그인이 필요한 데스! 빨리 들어오�
 @login_manager.user_loader
 def load_user(user_id):
     """Flask-Login 사용자 로드 콜백"""
-    return User.query.get(int(user_id))
+    return db.session.get(User, int(user_id))
 
 
 def create_app():
@@ -60,15 +60,22 @@ def create_app():
         db.create_all()
         _init_npc_parks()
 
-    # === 턴 스케줄러 시작 ===
-    from app.turn_scheduler import init_scheduler
-    init_scheduler(app)
+    # === [v1.7.0] 턴 스케줄러 시작 — consume_turn 기반 단일화로 비활성화 ===
+    # 기존 APScheduler 백그라운드 스케줄러는 이중 턴 처리(Double-Tick) 문제로 제거됨.
+    # 턴 흐름은 플레이어의 행동(AP 소비/턴 쿼터 소진)에 의한 consume_turn()으로만 처리.
+    # 참조: audit_report_3.md [ARCH-F001]
+    # from app.turn_scheduler import init_scheduler
+    # init_scheduler(app)
 
     return app
 
 
 def _init_npc_parks():
     """서버 시작 시 NPC 공원이 없으면 자동 생성"""
+    import os
+    from flask import current_app
+    if current_app.config.get('TESTING') or os.environ.get('TESTING') == 'true':
+        return
     from app.models import Park
     from app.config import GameConfig as GC
     import random

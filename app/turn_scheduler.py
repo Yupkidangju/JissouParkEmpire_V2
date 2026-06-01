@@ -15,25 +15,13 @@ scheduler = BackgroundScheduler(daemon=True)
 
 
 def init_scheduler(app):
-    """Flask 앱에 턴 스케줄러 연결"""
-    from app.config import GameConfig as GC
-
-    # 이미 실행 중이면 중복 방지
-    if scheduler.running:
-        return
-
-    # 턴 처리 작업 등록
-    scheduler.add_job(
-        func=_process_all_turns,
-        trigger=IntervalTrigger(seconds=GC.TURN_INTERVAL),
-        id='turn_processor',
-        name='실장석 공원 턴 처리 데스!',
-        replace_existing=True,
-        kwargs={'app': app},
-    )
-
-    scheduler.start()
-    app.logger.info(f"[스케줄러] 턴 처리 시작! 간격: {GC.TURN_INTERVAL}초")
+    """
+    [v1.7.0] 비활성화됨 — consume_turn 기반 단일화로 인해 스케줄러 시작 로직 중단.
+    이중 턴 처리(Double-Tick) 방지: 기존 APScheduler는 제거되었으며,
+    모든 턴 처리는 플레이어의 행동(AP 소비/턴 쿼터 소진)에 의한 consume_turn()으로만 수행됨.
+    참조: audit_report_3.md [ARCH-F001]
+    """
+    app.logger.info("[스케줄러] 비활성화됨 — consume_turn 기반 단일 턴 처리 모드")
 
 
 def _process_all_turns(app):
@@ -82,7 +70,7 @@ def force_process_turn(app, park_id):
         from app.game_engine import process_turn
         from app.npc_engine import process_npc_turn
 
-        park = Park.query.get(park_id)
+        park = db.session.get(Park, park_id)
         if park and not park.is_destroyed:
             process_turn(park)
             if park.is_npc:

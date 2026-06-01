@@ -257,5 +257,16 @@
     "flash.diplo_reject": "拒絕了同盟請求的說！",
     "flash.diplo_break_fail": "無法解除的關係的說！",
     "flash.diplo_not_mine": "不是自己的外交關係的說！",
-    "flash.reg_invalid_chars": "名稱不能包含特殊字元(<>&\"'等)的說！"
+    "flash.reg_invalid_chars": "名稱不能包含特殊字元(<>&\"'等)的說！",
+    "flash.invalid_building": "無效的建築類型！",
+    "flash.train_no_adults": "沒有可供訓練的成年體！",
+    "flash.birth_no_adults": "沒有可供生育的成年體！",
+    "flash.gather_negative": "不能派遣負數單位！",
+    "flash.gather_no_units": "至少需要派遣1個單位！",
+    "flash.spy_no_adults": "密使所需的成年體不足！（需要2個）",
+    "flash.ally_no_spy": "{name}是盟友！不能對盟友派遣密使！",
+    "flash.build_no_material": "建材不足！需要{cost}🧱！",
+    "flash.train_no_np": "糧食不足！訓練需要{cost}NP！",
+    "flash.birth_no_np": "糧食不足！生育需要{cost}NP！",
+    "flash.reg_duplicate": "該用戶名或公園名稱已被使用！"
 }

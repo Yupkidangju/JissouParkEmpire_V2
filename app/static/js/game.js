@@ -1,9 +1,23 @@
 /**
  * 실장석 공원 제국 - 게임 스크립트 (game.js)
  * [v1.7.0] Gore-Terminal 전용 UI 인터랙션 및 AJAX 실시간 시뮬레이터 통합
+ * [v1.8.9] escapeHtml 헬퍼 구축을 통한 정찰/공격 모달 DOM XSS 취약점 완치 (audit_report_62.md [IMP-F002])
  *
  * 모든 주석 및 경고 창 대사는 엄격히 '한국어'로만 기술됩니다.
  */
+
+// === HTML 이스케이프 헬퍼 함수 (XSS 방어용) ===
+function escapeHtml(str) {
+    if (!str) return '';
+    return str
+        .toString()
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;')
+        .replace(/\//g, '&#x2F;');
+}
 
 document.addEventListener('DOMContentLoaded', () => {
     // === 1. 플래시 메시지 자동 소멸 (8초 후 순차 소멸) ===
@@ -88,7 +102,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (data.success) {
                     let html = `<div class="border-b border-outline-variant/30 pb-2 mb-2">
-                        <strong>TERRITORY:</strong> ${parkName}<br>
+                        <strong>TERRITORY:</strong> ${escapeHtml(parkName)}<br>
                         <strong>STATUS:</strong> ACTIVE MAINframe
                     </div>`;
 
@@ -116,10 +130,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                     contentDiv.innerHTML = html;
                 } else {
-                    contentDiv.innerHTML = `<div class="text-error">> ACCESS DENIED: ${data.error || I18N.scoutFail}</div>`;
+                    contentDiv.innerHTML = `<div class="text-error">> ACCESS DENIED: ${escapeHtml(data.error || I18N.scoutFail)}</div>`;
                 }
             } catch (err) {
-                contentDiv.innerHTML = `<div class="text-error">> SYSTEM ERROR: ${err.message}</div>`;
+                contentDiv.innerHTML = `<div class="text-error">> SYSTEM ERROR: ${escapeHtml(err.message)}</div>`;
             }
         });
     });
@@ -136,7 +150,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!modal || !overlay) return;
 
             document.getElementById('attack-target-id').value = targetId;
-            document.getElementById('attack-title').innerHTML = `<span class="material-symbols-outlined text-sm">swords</span> INVASION: ${targetName}`;
+            document.getElementById('attack-title').innerHTML = `<span class="material-symbols-outlined text-sm">swords</span> INVASION: ${escapeHtml(targetName)}`;
 
             modal.classList.remove('hidden');
             overlay.classList.remove('hidden');
@@ -185,7 +199,7 @@ function updateAttackPreview() {
     const boss = bossCheckbox.checked;
 
     let power = guards * POWER_GUARD + adults * POWER_ADULT;
-    
+
     if (boss) {
         power += POWER_BOSS;
     }

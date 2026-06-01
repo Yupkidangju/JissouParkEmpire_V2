@@ -48,8 +48,8 @@
 * **MANDATORY GROUNDING:** 학습된 데이터(Training Data)는 최신 기술과 맞지 않을 가능성이 높으므로, 오류 해결에 실패할 경우 재시도 없이 '즉시' 그라운딩을 수행하여 최신 레퍼런스를 참조해야 한다.
 
 ## 6. Documentation Rules
-* **SPEC_IS_LAW:** `spec.md`는 이 프로젝트의 절대적인 **'마스터플랜(Master Plan)'**이다. 
-    * `designs.md`, `README.md`, `DESIGN_DECISIONS.md` 등 모든 하위 문서는 오직 `spec.md`에 명시된 기술 스펙과 방향성을 근간으로 파생되어야 한다. 
+* **SPEC_IS_LAW:** `spec.md`는 이 프로젝트의 절대적인 **'마스터플랜(Master Plan)'**이다.
+    * `designs.md`, `README.md`, `DESIGN_DECISIONS.md` 등 모든 하위 문서는 오직 `spec.md`에 명시된 기술 스펙과 방향성을 근간으로 파생되어야 한다.
     * 하위 문서 생성 및 수정 시 `spec.md`의 내용과 충돌하는 설정이나 임의의 기능 추가는 엄격히 금지된다.
 * **CRITICAL:** 모든 작업에서 문서 작성 및 갱신을 최우선 순위(Top Priority)로 두며, 개발 착수 전/후에 반드시 관련 문서를 먼저 점검한다.
 * **UTF-8 ENFORCEMENT (CRITICAL):** 모든 파일의 읽기 및 쓰기(소스 코드, 마크다운 문서 등 포함) 작업 시 반드시 **UTF-8 인코딩**을 강제한다. 한국어 Windows 환경의 기본 인코딩(cp949 등)으로 인해 텍스트가 깨지거나 데이터가 손실되는 문제를 원천 차단하기 위해, 시스템 환경에 의존하지 말고 모든 파일 I/O 작업에 명시적으로 UTF-8을 지정해야 한다.
@@ -108,7 +108,7 @@
 * **Commit Message:** Conventional Commits
 
 ## 12. Required Files
-* spec.md, README.md, CHANGELOG.md, BUILD_GUIDE.md, IMPLEMENTATION_SUMMARY.md, LESSONS_LEARNED.md, DESIGN_DECISIONS.md, audit_roadmap.md, designs.md
+* spec.md, README.md, CHANGELOG.md, BUILD_GUIDE.md, implementation_summary.md, lessons_learned.md, DESIGN_DECISIONS.md, audit_roadmap.md, designs.md
 
 ## 13. Automation Philosophy
 * **Agent Mode:** Autonomous
@@ -128,5 +128,5 @@
     * **Process:** 1. 과거 유사 프로젝트 문서 읽기 -> 2. 검증된 패턴 적용 -> 3. 동일 실수 방지 -> 4. 현재 프로젝트의 교훈 기록
 
 ## 15. Self Update Rules
-* 프로젝트 완료 시 'LESSONS_LEARNED.md'를 자동 생성하고 AI 학습 데이터로 전환할 것
+* 프로젝트 완료 시 'lessons_learned.md'를 자동 생성하고 AI 학습 데이터로 전환할 것
 * 버전 번호가 올라갈 때(Version Bump), 변경된 기능에 맞춰 'audit_roadmap.md'를 재작성하여 최신 감사 기준을 수립할 것

@@ -257,5 +257,16 @@
     "flash.diplo_reject": "Alliance request rejected desu!",
     "flash.diplo_break_fail": "Cannot dissolve this relation desu!",
     "flash.diplo_not_mine": "Not your diplomacy desu!",
-    "flash.reg_invalid_chars": "Name cannot contain special characters (<>&\"' etc.) desu!"
+    "flash.reg_invalid_chars": "Name cannot contain special characters (<>&\"' etc.) desu!",
+    "flash.invalid_building": "Invalid building type!",
+    "flash.train_no_adults": "No adults available for training!",
+    "flash.birth_no_adults": "No adults available for breeding!",
+    "flash.gather_negative": "Cannot send negative units!",
+    "flash.gather_no_units": "Must send at least 1 unit!",
+    "flash.spy_no_adults": "Not enough adults for spy mission! (Need 2)",
+    "flash.ally_no_spy": "{name} is an ally! Cannot spy on allies!",
+    "flash.build_no_material": "Materials are insufficient! Need {cost}🧱!",
+    "flash.train_no_np": "Food is insufficient! Training requires {cost}NP!",
+    "flash.birth_no_np": "Food is insufficient! Cannot give birth without {cost}NP!",
+    "flash.reg_duplicate": "That username or park name is already in use!"
 }
