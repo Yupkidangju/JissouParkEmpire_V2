@@ -153,15 +153,15 @@ def test_audit_report_61_npc_attack_lock_order(app):
         initial_log_count = BattleLog.query.count()
 
         # 실제 _sync_npc_turns()를 호출하여 플레이어와 동기화
-        # _sync_npc_turns 내부에서 1단계 process_turn -> commit -> 2단계 process_npc_turn 흐름이 완벽히 작동하는지 실질적으로 검증합니다.
+        # _sync_npc_turns 내부에서 1단계 process_turn -> commit -> 2단계 process_npc_turn 흐름이 정상 동작하는지 실질적으로 검증합니다.
         _sync_npc_turns(player_park)
 
         # 턴 동기화 성공 여부 검증
         db.session.refresh(npc_park)
         assert npc_park.turn_count == 1
 
-        # [v1.8.9 고도화] 실제 execute_battle()이 NPC 공격 동작 중 성공적으로 기동되었는지 증명
-        # 1. 턴 스케줄러를 통과하면서 NPC의 action_points가 3 -> (gather로 1 소모) 2 -> (attack으로 2 소모) 0으로 완전히 소진되었는지 확인
+        # [v1.8.9 고도화] 실제 execute_battle()이 NPC 공격 동작 중 정상 기동되었는지 확인
+        # 1. 턴 스케줄러를 통과하면서 NPC의 action_points가 3 -> (gather로 1 소모) 2 -> (attack으로 2 소모) 0으로 감소했는지 확인
         assert npc_park.action_points == 0
 
         # 2. BattleLog가 성공적으로 생성되었는지 확인
@@ -177,14 +177,14 @@ def test_audit_report_61_npc_attack_lock_order(app):
 def test_xss_escape_html(client):
     """
     [SEC-F002 XSS 헬퍼 교차 검증 및 정적 innerHTML 안전성 스캔 회귀 테스트]
-    악성 HTML/XSS 스크립트 문자열이 사용자 가입 시 철저히 차단되거나,
-    백엔드 렌더링 시 html.escape를 통해 온전히 이스케이프 처리되는지 확인합니다.
+    악성 HTML/XSS 스크립트 문자열이 사용자 가입 시 차단되거나,
+    백엔드 렌더링 시 html.escape를 통해 이스케이프 처리되는지 확인합니다.
     또한 static/js/game.js의 escapeHtml() 헬퍼 함수가 실제 static JS 리소스로부터
     정규식으로 추출된 소스코드로서 Node.js 런타임을 통해 교차 기동 및 검증되는지 정적/결합 수준에서 실증합니다.
     """
     # 1. 특수문자 및 악성 스크립트 공원명/유저명 가입 가드 검증
     # [v1.8.9 고도화] 실제 auth_routes.py에서 사용하는 폼 필드인 'password2'를 정상 전송하여
-    # 비밀번호 불일치 예외 분기로 빠지지 않고 실제 위험 문자 차단 가드 분기까지 완벽히 도달시킵니다.
+    # 비밀번호 불일치 예외 분기로 빠지지 않고 실제 위험 문자 차단 가드 분기까지 도달시킵니다.
     response = client.post('/register', data={
         'username': 'xss_user',
         'password': 'password123',
@@ -395,7 +395,7 @@ def test_static_js_inner_html_xss_protection():
                 f"XSS 취약점 검출! game.js의 innerHTML 동적 대입 중 안전 가드(escapeHtml) 누락: {value_stripped}"
 
     # 2. [v1.8.9 고도화] game.js 내의 모든 innerHTML 및 HTML 빌더 관련 백틱(`...`) 템플릿 리터럴 전수 조사
-    # 특정 라인 슬라이스 의존성을 완전히 탈피하여 파일 구조 변경에도 견고하게 작동하도록 전사적 정적 분석을 수행합니다.
+    # 특정 라인 슬라이스 의존성을 제거하여 파일 구조 변경에도 견고하게 작동하도록 전사적 정적 분석을 수행합니다.
     # innerHTML 대입 혹은 html 변수(HTML builder) 누적에 사용되는 백틱 블록만 추출하여 confirm 등 텍스트 확인창의 오탐을 배제합니다.
     template_matches = re.findall(r'(\bhtml\s*\+?=\s*`|innerHTML\s*=\s*`)(.*?)(?<!\\)`', js_content, re.DOTALL)
     template_literals = [match[1] for match in template_matches]

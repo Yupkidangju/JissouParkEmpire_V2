@@ -1,7 +1,7 @@
 /**
  * 실장석 공원 제국 - 게임 스크립트 (game.js)
  * [v1.7.0] Gore-Terminal 전용 UI 인터랙션 및 AJAX 실시간 시뮬레이터 통합
- * [v1.8.9] escapeHtml 헬퍼 구축을 통한 정찰/공격 모달 DOM XSS 취약점 완치 (audit_report_62.md [IMP-F002])
+ * [v1.8.9] escapeHtml 헬퍼 구축을 통한 정찰/공격 모달 DOM XSS 취약점 완화 (audit_report_62.md [IMP-F002])
  *
  * 모든 주석 및 경고 창 대사는 엄격히 '한국어'로만 기술됩니다.
  */

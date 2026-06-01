@@ -26,7 +26,7 @@ def process_npc_turn(park):
     NPC 공원의 턴별 AI 행동.
     AP를 소비하며, 성격에 따라 행동 우선순위가 결정된다.
     [v1.8.1] DB 비관적 락 획득: Lost Update 및 동시 개입 방지 (audit_report_48.md [STATE-F022])
-    [v1.8.9] 락 획득 순서 역전 교착 상태 완치 (audit_report_61.md [DEADLOCK-F005])
+    [v1.8.9] 락 획득 순서 역전 교착 상태 완화 (audit_report_61.md [DEADLOCK-F005])
     - 이전 버전에서 최상단에 일괄 적용되었던 비관적 락(with_for_update)은 NPC가 다른 공원을 공격하여
       execute_battle을 호출할 때 Canonical Locking 정렬(Player -> NPC) 락 획득 과정과 얽혀
       치명적인 상호 교착 상태(Deadlock)를 초래하고 DB 커넥션을 고갈시켰음.
@@ -36,7 +36,7 @@ def process_npc_turn(park):
     if park.is_destroyed or not park.is_npc:
         return
 
-    # [v1.8.9] 교착 상태(DEADLOCK-F005) 완치를 위해 최상단 비관적 락(with_for_update)을 제거함.
+    # [v1.8.9] 교착 상태(DEADLOCK-F005) 완화를 위해 최상단 비관적 락(with_for_update)을 제거함.
     # 동시성 정합성을 해치지 않기 위해 단순 refresh만 수행하여 최신 상태로 새로고침함.
     db.session.refresh(park)
 
@@ -147,7 +147,7 @@ def _npc_gather(park):
     if park.action_points < 1:
         return
     idle_adults = max(1, park.adult_count // 2)
-    # [v1.8.1] commit=False 전달: NPC 턴 원자적 트랜잭션 롤백 보장 (audit_report_48.md [STATE-F022])
+    # [v1.8.1] commit=False 전달: NPC 턴 원자적 트랜잭션 롤백 유지 (audit_report_48.md [STATE-F022])
     success, _, _ = game_engine.action_gather(park, num_adults=idle_adults, num_children=0, commit=False)
     if success:
         park.action_points -= 1
@@ -163,7 +163,7 @@ def _npc_birth(park):
         return  # 인구 거의 다 참
     if park.total_np_available < GC.BIRTH_NP_COST * 2:
         return  # 식량 여유 없으면 안 함
-    # [v1.8.1] commit=False 전달: NPC 턴 원자적 트랜잭션 롤백 보장 (audit_report_48.md [STATE-F022])
+    # [v1.8.1] commit=False 전달: NPC 턴 원자적 트랜잭션 롤백 유지 (audit_report_48.md [STATE-F022])
     success, _, _ = game_engine.action_birth(park, commit=False)
     if success:
         park.action_points -= 2
@@ -177,7 +177,7 @@ def _npc_build_house(park):
         return  # 아직 여유 있으면 안 함
     if park.material < GC.BUILDINGS['cardboard_house']['material_cost']:
         return
-    # [v1.8.1] commit=False 전달: NPC 턴 원자적 트랜잭션 롤백 보장 (audit_report_48.md [STATE-F022])
+    # [v1.8.1] commit=False 전달: NPC 턴 원자적 트랜잭션 롤백 유지 (audit_report_48.md [STATE-F022])
     success, _, _ = game_engine.action_build(park, 'cardboard_house', commit=False)
     if success:
         park.action_points -= 1

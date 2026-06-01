@@ -351,7 +351,7 @@
 | 색맹 대응 | 텍스트 + 이모지 + 위치 3중 정보 | 접근성 최소 확보 |
 | 모바일 터치 | 버튼 min-height 48px | iOS/Android 터치 타겟 규격 |
 | 폼 확대 방지 | `input[type="number"] font-size: 16px` | iOS 자동 확대 방지 |
-| 보상 트랜잭션 AP 복구 | 실패 (`not success`) 시 AP 즉시 자동 환불 복구 | 분할 트랜잭션 선행 커밋으로 인한 AP 증발 및 누수 완벽 차단 |
+| 보상 트랜잭션 AP 복구 | 실패 (`not success`) 시 AP 즉시 자동 환불 복구 | 분할 트랜잭션 선행 커밋으로 인한 AP 증발 및 누수 위험 완화 |
 
 ---
 
@@ -397,19 +397,19 @@
 
 ### 13.2 다국어(i18n) 통합 방침
 *   모든 카테고리명(AUTHORITY, SKILLS) 및 텍스트 요소는 다른 파일들과 마찬가지로 다국어 지원을 위해 `t('skills.category_authority')` 등으로 처리.
-*   다국어 번역 키가 존재하지 않는 디테일한 설명은 이스터에그의 특성을 살려 `app/lang/ko.json` 및 `en.json` 등 각 다국어 파일에 키를 완벽하게 정의하여 반영.
+*   다국어 번역 키가 존재하지 않는 디테일한 설명은 이스터에그의 특성을 살려 `app/lang/ko.json` 및 `en.json` 등 각 다국어 파일에 키를 명시적으로 정의하여 반영.
 
 ---
 
 ## 14. 보상 트랜잭션 및 AP 복구 UX 사양 [NEW]
 
-행동 실행 실패 시 이미 선행 커밋되어 차감된 AP를 즉시 100% 되돌려주어 사용자에게 리소스 무손실 경험을 보장합니다.
+행동 실행 실패 시 이미 선행 커밋되어 차감된 AP를 즉시 되돌려주어 사용자에게 리소스 무손실에 가까운 경험을 제공합니다.
 
 ### 14.1 리소스 무손실 예외 흐름
 1.  **사용자 행동 트리거:** 플레이어가 채집/건설/출산 등의 행동 버튼을 클릭.
 2.  **선행 AP 감산 및 커밋:** 서버의 `consume_turn()`에서 AP를 미리 깎고 데이터베이스에 즉시 커밋하여 트랜잭션을 조기 종료함 (Ghost AP 차단 및 동시성 락 충돌 우회).
 3.  **행동 로직 검증 및 실패:** 비즈니스 엔진(`game_engine.py` 등)에서 자재 부족, 사기 부족, 파업(`strike_turns > 0`) 등의 예외로 인해 행동 처리 실패(`success == False`)가 리턴됨.
-4.  **보상 트랜잭션 작동:** 즉각 `game_engine.refund_ap(park, cost)` 가 호출되어 DB에 플레이어의 AP를 차감된 만큼 즉시 복구(증가) 및 재커밋 처리.
+4.  **보상 트랜잭션 작동:** `game_engine.refund_ap(park, cost)` 가 호출되어 DB에 플레이어의 AP를 차감된 만큼 복구(증가) 및 재커밋 처리.
 5.  **사용자 피드백 (Flash Message):** 화면 상단에 해당 행동의 실패 메시지가 **붉은색 경고(error)** 플래시 메시지로 렌더링되나, 대시보드의 AP 수치는 차감되지 않고 그대로 보존됨.
 
 ### 14.2 침공(Attack) 무산 시의 복구 사양
@@ -435,29 +435,29 @@
 
 ### 16.1 Canonical Ordering을 통한 Unique 제약 강제
 1.  **동적 정렬 저장**: 두 공원의 ID 쌍에 대해 항상 `park_a_id = min(A, B)`, `park_b_id = max(A, B)`로 정렬하여 DB에 저장합니다.
-2.  **Unique 제약 작동**: 이로 인해 `(A, B)`와 `(B, A)`라는 두 개의 별도 레코드로 교차 저장되던 빈틈이 완벽히 봉쇄되고, 데이터베이스 수준의 UniqueConstraint가 동일 공원 쌍에 대해 단 하나의 관계 상태만 존재하도록 강제합니다.
+2.  **Unique 제약 작동**: 이로 인해 `(A, B)`와 `(B, A)`라는 두 개의 별도 레코드로 교차 저장되던 빈틈이 줄어들고, 데이터베이스 수준의 UniqueConstraint가 동일 공원 쌍에 대해 단 하나의 관계 상태만 존재하도록 강제합니다.
 3.  **발송자 식별**: `initiator_id` 컬럼을 외래키로 추가하여, ID가 min/max로 정렬되더라도 원래 어떤 공원이 이 외교를 요청했는지를 정확하게 식별하고 수락/거절 권한 검증에 활용합니다.
 
 ### 16.2 2-Way Pessimistic Lock 및 Bulk Update 흐름
-1.  **2중 비관적 락**: 외교 라우터 진입 시 `park.id`와 `target.id` 두 ID를 오름차순으로 정렬하여 `with_for_update()` 락을 획득합니다. 교차 요청이 있더라도 동일한 순서로 순차 대기하게 되므로 교사 데드락(Deadlock)이 완벽히 방지됩니다.
+1.  **2중 비관적 락**: 외교 라우터 진입 시 `park.id`와 `target.id` 두 ID를 오름차순으로 정렬하여 `with_for_update()` 락을 획득합니다. 교차 요청이 있더라도 동일한 순서로 순차 대기하게 되므로 교착 상태(Deadlock) 위험이 크게 줄어듭니다.
 2.  **Bulk Update 일괄 해제**: 관계를 변경(적대 선언 시 기존 동맹 파기, 외교 해제 등)할 때 `.first()`로 개별 레코드만 찾아서 바꾸는 대신, `.update()` 벌크 쿼리를 사용해 해당 공원 쌍 간의 모든 active/pending 중복 관계를 한 번에 `dissolved` 상태로 변경하여 잠재적 상태 오염을 자동 복구/예방합니다.
 
 ---
 
 ## 17. NPC 공격 시 락 순서 역전 교착 상태 방지 및 통제 완화 설계 [NEW]
 
-NPC가 다른 공원을 공격할 때 락 획득 순서가 뒤틀려 영구적인 교착 상태(Deadlock)에 빠지고 데이터베이스 커넥션이 고갈되는 설계 결함 `[DEADLOCK-F005]`을 완전히 해소합니다.
+NPC가 다른 공원을 공격할 때 락 획득 순서가 뒤틀려 영구적인 교착 상태(Deadlock)에 빠지고 데이터베이스 커넥션이 고갈되는 설계 결함 `[DEADLOCK-F005]`을 크게 완화합니다.
 
 ### 17.1 NPC 턴 진행 및 행동 AI 2단계 트랜잭션 경계 분리 설계
-1.  **선점 락 원천 소멸**: 턴 동기화 스케줄러 `_sync_npc_turns()` 레벨에서 NPC 기본 턴 처리(`process_turn`) 완료 즉시 명시적인 `db.session.commit()`을 집행하여 선점 락을 완전히 해제 및 원천 소멸시킵니다.
-2.  **독립된 2단계 트랜잭션 AI 기동**: 선점 락이 완전히 비워진 깨끗한 상태에서 비로소 NPC AI 행동 의사결정 및 침공 기동(`process_npc_turn()`)에 안전하게 진입하도록 **2단계 트랜잭션 경계 분리 구조**를 전격 채택했습니다.
-3.  **최상단 락 선점 제거 및 역할 위임**: `process_npc_turn()` 시작 부분에서 무조건적으로 대상 NPC 공원 레코드를 `with_for_update()`로 락킹하던 선점 락을 영구히 제거하고 단순 `db.session.refresh(park)`만 호출하도록 완화했습니다. 이로 인해 전투(`execute_battle()`) 등 개별 행동 단위가 독자적으로 Canonical Ordering 락을 순서대로 획득하도록 역할을 위임하였습니다.
+1.  **선점 락 해제**: 턴 동기화 스케줄러 `_sync_npc_turns()` 레벨에서 NPC 기본 턴 처리(`process_turn`) 완료 즉시 명시적인 `db.session.commit()`을 집행하여 선점 락을 해제합니다.
+2.  **독립된 2단계 트랜잭션 AI 기동**: 선점 락이 비워진 상태에서 비로소 NPC AI 행동 의사결정 및 침공 기동(`process_npc_turn()`)에 진입하도록 **2단계 트랜잭션 경계 분리 구조**를 채택했습니다.
+3.  **최상단 락 선점 제거 및 역할 위임**: `process_npc_turn()` 시작 부분에서 무조건적으로 대상 NPC 공원 레코드를 `with_for_update()`로 락킹하던 선점 락을 제거하고 단순 `db.session.refresh(park)`만 호출하도록 완화했습니다. 이로 인해 전투(`execute_battle()`) 등 개별 행동 단위가 독자적으로 Canonical Ordering 락을 순서대로 획득하도록 역할을 위임하였습니다.
 
 ### 17.2 Canonical Locking 및 SQLite WAL/busy_timeout Pragma 주입 설계
-1.  **오름차순 순차 대기 보장**: 최상단의 락 선점이 제거됨에 따라, NPC가 공격 성향에 의해 `execute_battle()`을 호출할 때만 비로소 공격자(NPC)와 방어자(Player)의 락이 작동합니다.
-2.  **교착 대기 원천 차단**: 두 공원의 ID를 오름차순 정렬하여 `Park.id.in_(lock_ids)` 조건 하에 `with_for_update()` 비관적 락을 동시에 획득하므로, 플레이어 스레드와 NPC 스레드가 교차 락 획득을 시도하더라도 항상 정렬된 순서에 의해 순차적으로 락을 양보하고 획득하며 영구적인 교착 상태 및 커넥션 풀 고갈을 완전 차단합니다.
-3.  **SQLite WAL 및 busy_timeout pragma 실제 활성화**: 기본 배포 DB인 SQLite 환경에서 `with_for_update()` no-op(FOR UPDATE SQL 미생성) 한계를 극복하고 동시성 쓰기 병목 및 Database Locked 예외를 방어하기 위해, `Engine` 'connect' 이벤트 리스너를 구축하여 SQLite 연결 즉시 `PRAGMA journal_mode=WAL` 및 `PRAGMA busy_timeout=5000`을 강제 자동 주입하도록 완치했습니다.
-4.  **Lock-free Gap 설계적 절충 및 Row-Lock DB 확장성 매핑**: 2단계 분리 구조로 인해 NPC 행동 AI 기동 시점에 생기는 일시적 무락 갭(Lock-free Gap)은, 행동 결정 시점에 플레이어의 자원 수치가 다소 변할 수 있으나 데드락 회피를 위해 감수한 고도의 설계적 절충(Trade-off)입니다. 이 설계는 향후 PostgreSQL, MySQL 등 실제 행 락(Row Lock) RDBMS 환경으로 전환하여 Gunicorn 다중 워커 프로덕션 서버를 대규모로 수평 확장할 때도 소스 코드 변경 없이 완벽한 정합성과 최고의 격리 안정성을 완벽하게 보장합니다.
+1.  **오름차순 순차 대기 유지**: 최상단의 락 선점이 제거됨에 따라, NPC가 공격 성향에 의해 `execute_battle()`을 호출할 때만 비로소 공격자(NPC)와 방어자(Player)의 락이 작동합니다.
+2.  **교착 대기 억제**: 두 공원의 ID를 오름차순 정렬하여 `Park.id.in_(lock_ids)` 조건 하에 `with_for_update()` 비관적 락을 동시에 획득하므로, 플레이어 스레드와 NPC 스레드가 교차 락 획득을 시도하더라도 정렬된 순서에 따라 순차적으로 락을 양보하고 획득하며 교착 상태 및 커넥션 풀 고갈 위험을 줄입니다.
+3.  **SQLite WAL 및 busy_timeout pragma 실제 활성화**: 기본 배포 DB인 SQLite 환경에서 `with_for_update()` no-op(FOR UPDATE SQL 미생성) 한계를 극복하고 동시성 쓰기 병목 및 Database Locked 예외를 방어하기 위해, `Engine` 'connect' 이벤트 리스너를 구축하여 SQLite 연결 즉시 `PRAGMA journal_mode=WAL` 및 `PRAGMA busy_timeout=5000`을 강제 자동 주입하도록 설정했습니다.
+4.  **Lock-free Gap 설계적 절충 및 Row-Lock DB 확장성 매핑**: 2단계 분리 구조로 인해 NPC 행동 AI 기동 시점에 생기는 일시적 무락 갭(Lock-free Gap)은, 행동 결정 시점에 플레이어의 자원 수치가 다소 변할 수 있으나 데드락 회피를 위해 감수한 설계적 절충(Trade-off)입니다. 이 설계는 향후 PostgreSQL, MySQL 등 실제 행 락(Row Lock) RDBMS 환경으로 전환하여 Gunicorn 다중 워커 프로덕션 서버를 대규모로 수평 확장할 때도 소스 코드 변경 없이 높은 정합성과 격리 안정성을 유지하도록 돕습니다.
 
 ---
 

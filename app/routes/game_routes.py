@@ -110,7 +110,7 @@ def gather():
     )
 
     # [v1.8.2] 행동 실패 시 선행 커밋된 AP를 안전하게 복구 (보상 트랜잭션)
-    # [v1.8.9] AP 블랙홀 방지: 환불 후 라우터 단에서 명시적으로 트랜잭션을 최종 커밋하여 환불 수치 영구 저장 (audit_report_58.md)
+    # [v1.8.9] AP 환불 정합성: 환불 후 라우터 단에서 명시적으로 트랜잭션을 마무리하여 환불 수치를 반영 (audit_report_58.md)
     if not success:
         game_engine.refund_ap(park, 1)
         db.session.commit()
@@ -175,7 +175,7 @@ def birth():
     success, result, messages = game_engine.action_birth(park)
 
     # [v1.8.2] 행동 실패 시 선행 커밋된 AP를 안전하게 복구 (보상 트랜잭션)
-    # [v1.8.9] AP 블랙홀 방지: 환불 후 라우터 단에서 명시적으로 트랜잭션을 최종 커밋하여 환불 수치 영구 저장 (audit_report_58.md)
+    # [v1.8.9] AP 환불 정합성: 환불 후 라우터 단에서 명시적으로 트랜잭션을 마무리하여 환불 수치를 반영 (audit_report_58.md)
     if not success:
         game_engine.refund_ap(park, 2)
         db.session.commit()
@@ -219,7 +219,7 @@ def build():
     success, result, messages = game_engine.action_build(park, building_type)
 
     # [v1.8.2] 행동 실패 시 선행 커밋된 AP를 안전하게 복구 (보상 트랜잭션)
-    # [v1.8.9] AP 블랙홀 방지: 환불 후 라우터 단에서 명시적으로 트랜잭션을 최종 커밋하여 환불 수치 영구 저장 (audit_report_58.md)
+    # [v1.8.9] AP 환불 정합성: 환불 후 라우터 단에서 명시적으로 트랜잭션을 마무리하여 환불 수치를 반영 (audit_report_58.md)
     if not success:
         game_engine.refund_ap(park, 1)
         db.session.commit()
@@ -257,7 +257,7 @@ def train():
     success, result, messages = game_engine.action_train(park)
 
     # [v1.8.2] 행동 실패 시 선행 커밋된 AP를 안전하게 복구 (보상 트랜잭션)
-    # [v1.8.9] AP 블랙홀 방지: 환불 후 라우터 단에서 명시적으로 트랜잭션을 최종 커밋하여 환불 수치 영구 저장 (audit_report_58.md)
+    # [v1.8.9] AP 환불 정합성: 환불 후 라우터 단에서 명시적으로 트랜잭션을 마무리하여 환불 수치를 반영 (audit_report_58.md)
     if not success:
         game_engine.refund_ap(park, 1)
         db.session.commit()
@@ -437,7 +437,7 @@ def restart():
     # 기존 공원의 정보 보존
     old_name = park.name
 
-    # [v1.8.0] 단일 트랜잭션(Atomic)으로 묶어 기존 삭제와 새 생성의 정합성 보장 (audit_report_47.md [STATE-F021])
+    # [v1.8.0] 단일 트랜잭션(Atomic)으로 묶어 기존 삭제와 새 생성의 정합성 유지 (audit_report_47.md [STATE-F021])
     db.session.delete(park)
     game_engine.create_default_park(current_user)
 
@@ -758,7 +758,7 @@ def trade_create():
 
     # [v1.6.0] 원자적 에스크로: SQL 레벨에서 보유량 조건 포함 차감
     # 동시 요청 시 WHERE 조건 불일치로 DB가 자동 차단 (Race Condition 방지)
-    # @validates가 조용히 음수를 0으로 만드는 역설을 근본 차단
+    # @validates가 음수를 0으로 보정하는 역설을 방지
     updated = Park.query.filter(
         Park.id == park.id,
         Park.konpeito >= offer_konpeito,
@@ -904,7 +904,7 @@ def trade_accept(trade_id):
     # [v1.7.0] 수락자/발송자 모두 원자적 UPDATE + case() cap 보정 (audit_report_11.md [IMP-F028])
 
     # 1단계: 수락자가 받을 것을 더함 (offer, 에스크로에서) — 원자적 UPDATE + cap 보정
-    # [v1.7.0] baby_cap hybrid_property 사용: 운치굴 0개일 때도 최소 5마리 보장 (audit_report_32.md [STATE-F007])
+    # [v1.7.0] baby_cap hybrid_property 사용: 운치굴 0개일 때도 최소 5마리 유지 (audit_report_32.md [STATE-F007])
     Park.query.filter(Park.id == park.id).update({
         'konpeito': case((Park.konpeito + trade.offer_konpeito > Park.konpeito_cap, Park.konpeito_cap), else_=Park.konpeito + trade.offer_konpeito),
         'trash_food': case((Park.trash_food + trade.offer_trash > Park.trash_food_cap, Park.trash_food_cap), else_=Park.trash_food + trade.offer_trash),
@@ -913,7 +913,7 @@ def trade_accept(trade_id):
     })
 
     # 2단계: 발송자에게 수락자가 준 것을 더함 — 원자적 UPDATE + cap 보정
-    # [v1.7.0] baby_cap hybrid_property 사용: 운치굴 0개일 때도 최소 5마리 보장 (audit_report_32.md [STATE-F007])
+    # [v1.7.0] baby_cap hybrid_property 사용: 운치굴 0개일 때도 최소 5마리 유지 (audit_report_32.md [STATE-F007])
     Park.query.filter(Park.id == sender.id).update({
         'konpeito': case((Park.konpeito + trade.request_konpeito > Park.konpeito_cap, Park.konpeito_cap), else_=Park.konpeito + trade.request_konpeito),
         'trash_food': case((Park.trash_food + trade.request_trash > Park.trash_food_cap, Park.trash_food_cap), else_=Park.trash_food + trade.request_trash),
@@ -1039,7 +1039,7 @@ def diplomacy_ally(target_id):
         flash(get_text('flash.diplo_invalid'), 'error')
         return redirect(url_for('game.trade_market'))
 
-    # [v1.8.5] Canonical Ordering: 항상 park_a_id < park_b_id 보장
+    # [v1.8.5] Canonical Ordering: 항상 park_a_id < park_b_id가 되도록 정렬
     park_a_id = min(park.id, target.id)
     park_b_id = max(park.id, target.id)
 
@@ -1183,14 +1183,14 @@ def diplomacy_enemy(target_id):
     db.session.refresh(target)
 
     # 락 대기 후 멸망 상태 재검증 (TOCTOU 방지)
-    # [v1.8.9] AP 블랙홀 방지: 락 대기 후 대상 멸망 예외 분기 시 AP 복구 후 명시적 커밋 집행 (audit_report_58.md)
+    # [v1.8.9] AP 환불 정합성: 락 대기 후 대상 멸망 예외 분기 시 AP 복구 후 명시적 커밋 집행 (audit_report_58.md)
     if park.is_destroyed or target.is_destroyed:
         game_engine.refund_ap(park, 1)
         db.session.commit()
         flash(get_text('flash.diplo_invalid'), 'error')
         return redirect(url_for('game.trade_market'))
 
-    # [v1.8.5] Canonical Ordering: 항상 park_a_id < park_b_id 보장
+    # [v1.8.5] Canonical Ordering: 항상 park_a_id < park_b_id가 되도록 정렬
     park_a_id = min(park.id, target.id)
     park_b_id = max(park.id, target.id)
 
@@ -1211,7 +1211,7 @@ def diplomacy_enemy(target_id):
     ).first()
     if existing_enemy:
         # [v1.8.2] 이미 적대인 경우에도 consume_turn으로 차감된 1AP를 환불 (보상 트랜잭션)
-        # [v1.8.9] AP 블랙홀 방지: 이미 적대 상태 시 AP 복구 후 명시적 커밋 집행 (audit_report_58.md)
+        # [v1.8.9] AP 환불 정합성: 이미 적대 상태 시 AP 복구 후 명시적 커밋 집행 (audit_report_58.md)
         game_engine.refund_ap(park, 1)
         db.session.commit()
         flash(get_text('flash.diplo_exists'), 'warning')
@@ -1231,7 +1231,7 @@ def diplomacy_enemy(target_id):
     except IntegrityError:
         db.session.rollback()
         # [v1.8.2] game_engine.refund_ap 공용 헬퍼로 환불 처리 통합
-        # [v1.8.9] AP 블랙홀 방지: IntegrityError 롤백 직후 AP 복구 후 명시적 커밋 집행 (audit_report_58.md)
+        # [v1.8.9] AP 환불 정합성: IntegrityError 롤백 직후 AP 복구 후 명시적 커밋 집행 (audit_report_58.md)
         game_engine.refund_ap(park, 1)
         db.session.commit()
         flash(get_text('flash.diplo_exists'), 'warning')
@@ -1340,7 +1340,7 @@ def spy_send(target_id):
     # 이미 차감·커밋된 AP를 복구 (audit_report_46.md [LOGIC-F018])
     # [v1.8.2] game_engine.refund_ap 공용 헬퍼로 환불 처리 통합
     if not success:
-        # [v1.8.9] AP 블랙홀 방지: 밀사 파견 실패 시 AP 복구 후 명시적 커밋 집행 (audit_report_58.md)
+        # [v1.8.9] AP 환불 정합성: 밀사 파견 실패 시 AP 복구 후 명시적 커밋 집행 (audit_report_58.md)
         game_engine.refund_ap(park, GC.SPY_AP_COST)
         db.session.commit()
 
@@ -1362,5 +1362,3 @@ def skills_tree():
         'skills.html',
         park=park
     )
-
-

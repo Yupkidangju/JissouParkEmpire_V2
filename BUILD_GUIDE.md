@@ -14,7 +14,7 @@ git clone <your-repo-url>
 cd JissouParkEmpire
 
 # 가상환경 생성 및 활성화
-python -m venv venv
+python3 -m venv venv
 # Windows
 venv\Scripts\activate
 # Linux/macOS
@@ -24,7 +24,7 @@ source venv/bin/activate
 pip install -r requirements.txt
 
 # 가상환경(venv) 활성화 상태에서 서버 실행
-python run.py
+python3 run.py
 
 # 또는 가상환경 외부에서 직접 절대경로로 실행
 venv/bin/python run.py
@@ -123,10 +123,10 @@ sudo systemctl start jissou-park
 sudo systemctl status jissou-park
 ```
 
-#### Gunicorn에 맞게 run.py 수정 필요
+#### Gunicorn 실행 시 run.py 노출 확인
 
 ```python
-# run.py 끝에 추가 (Gunicorn이 app 객체를 인식하도록)
+# run.py에는 이미 app = create_app()가 존재하므로 추가 수정은 필요하지 않습니다.
 app = create_app()
 ```
 
@@ -334,4 +334,3 @@ sudo lsof -i :80
   - **매 커밋(Commit) 전**: `git diff --check` 및 `git diff --cached --check`를 상시 실행하여 형상 관리 규격을 유지합니다.
   - **매 원격 푸시(Push) 및 이주(Migration) 전**: `venv/bin/python -m pytest -q -W error`를 필수 가동하여 모든 비즈니스 로직 및 동시성 락, XSS 보안 회귀 테스트 통과를 강제합니다.
   - **정기 품질 감사**: 2주 단위로 프로젝트 총괄 책임자의 검토 하에 전체 로컬 수동 품질 게이트를 일괄 점검 및 아카이빙합니다.
-

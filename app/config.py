@@ -25,7 +25,7 @@ class Config:
     """Flask 기본 설정"""
     # [v1.8.9] 안전 실패(Fail-safe) 디버그 기본값 설정:
     # 환경변수에 명시적으로 'true' 또는 '1'이 들어오지 않는 한, 기본적으로 무조건 False(디버그 오프) 상태로 시작함.
-    # 이를 통해 프로덕션 배포 상태에서 디버그 모드가 실수로 유지되어 /debug 라우트가 노출되는 위협을 완벽히 소멸시킴.
+    # 이를 통해 프로덕션 배포 상태에서 디버그 모드가 실수로 유지되어 /debug 라우트가 노출되는 위협을 강하게 차단함.
     DEBUG = os.environ.get('DEBUG', 'false').lower() in ('true', '1', 'yes')
 
     # [v1.8.9] 유연한 환경변수 정합성 확보 (SECRET_KEY와 FLASK_SECRET_KEY 둘 다 바인딩 지원)
@@ -33,7 +33,7 @@ class Config:
 
     # [v1.8.9] 프로덕션 환경 판별을 더욱 강건하게 구성합니다.
     # FLASK_ENV가 'production'이거나 ENV_TYPE이 'production'인 경우,
-    # DEBUG=true 설정이나 SECRET_KEY 누락 상태에서의 임시 난수 키 fallback을 원천 차단합니다.
+    # DEBUG=true 설정이나 SECRET_KEY 누락 상태에서의 임시 난수 키 fallback을 차단합니다.
     _flask_env = os.environ.get('FLASK_ENV', '').lower()
     _env_type = os.environ.get('ENV_TYPE', '').lower()
     _is_explicit_production = (_flask_env == 'production' or _env_type == 'production')
@@ -147,7 +147,7 @@ class GameConfig:
 
     # === 성장 확률 ===
     CHILD_TO_ADULT_CHANCE = 0.05   # 턴당 5%
-    CHILD_TO_ADULT_GUARANTEE = 10  # 10턴 후 보장
+    CHILD_TO_ADULT_GUARANTEE = 10  # 10턴 후 전환 기준
 
     # === 출산 ===
     BIRTH_CHILDREN = (3, 6)   # 자실장 출산 수

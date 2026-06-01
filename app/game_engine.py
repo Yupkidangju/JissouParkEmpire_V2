@@ -175,10 +175,10 @@ def consume_turn(park, ap_cost=1):
 def _sync_npc_turns(player_park):
     """
     [v1.2.0] NPC 공원 동기 턴 처리 (플레이어 턴 소비 시 호출)
-    [v1.8.5] 개별 트랜잭션 단위 락 획득으로 Lost Update 및 Auto-Flush 데이터 유실 원천 해결 (audit_report_54.md [STATE-F028])
+    [v1.8.5] 개별 트랜잭션 단위 락 획득으로 Lost Update 및 Auto-Flush 데이터 유실 완화 (audit_report_54.md [STATE-F028])
     """
     from app.npc_engine import process_npc_turn
-    # [v1.8.5] 루프 외부에서는 ID 목록만 추출하여 개별 루프 트랜잭션 격리 보장 (데드락 방지 오름차순 정렬)
+    # [v1.8.5] 루프 외부에서는 ID 목록만 추출하여 개별 루프 트랜잭션 격리 유지 (데드락 방지 오름차순 정렬)
     npc_ids = [p.id for p in Park.query.filter_by(is_npc=True, is_destroyed=False).order_by(Park.id.asc()).all()]
     for npc_id in npc_ids:
         # 개별 트랜잭션 단위로 비관적 락 획득 및 조회
@@ -192,15 +192,15 @@ def _sync_npc_turns(player_park):
         if npc_park.turn_count >= player_park.turn_count:
             continue
 
-        # [v1.8.9] 락 순서 역전 교착 상태 완치 (audit_report_62.md [DEADLOCK-F005])
-        # - 1단계: NPC 기본 턴 처리 (식량 소비, 기아, 질병 등) 수행 후 즉각 커밋하여 선점 락을 안전하게 해제함
+        # [v1.8.9] 락 순서 역전 교착 상태 완화 (audit_report_62.md [DEADLOCK-F005])
+        # - 1단계: NPC 기본 턴 처리 (식량 소비, 기아, 질병 등) 수행 후 커밋하여 선점 락을 해제함
         process_turn(npc_park)
         db.session.commit()
 
-        # - 2단계: 선점 락이 완전히 해제된 상태에서 NPC AI 행동 의사결정 및 연산을 구동함
-        # 이 시점에는 락이 풀려 있으므로 execute_battle 진입 시 Canonical Ordering 정렬 락 획득이 데드락 없이 안전하게 동작함
+        # - 2단계: 선점 락이 해제된 상태에서 NPC AI 행동 의사결정 및 연산을 구동함
+        # 이 시점에는 락이 풀려 있으므로 execute_battle 진입 시 Canonical Ordering 정렬 락 획득이 데드락 가능성을 낮춘다.
         process_npc_turn(npc_park)
-        # NPC의 AI 행동 완료 후 변경된 AP 차감 및 자원 상태를 최종 커밋하여 영구 반영함
+        # NPC의 AI 행동 완료 후 변경된 AP 차감 및 자원 상태를 최종 커밋하여 반영함
         db.session.commit()
 
 
@@ -224,7 +224,7 @@ def check_and_enter_protection(park):
     """
     [v1.3.0] 보호 모드 진입 체크 + 자원 리셋.
     현재 자원이 보호 리셋 기준보다 낮으면 보호 리셋 수준까지 보충한다.
-    (실장석은 재배치, 자원은 최소 보장)
+    (실장석은 재배치, 자원은 최소 유지)
     [v1.7.0] 일회성 부조: 보호 모드 에피소드당 1회만 리셋 적용 (audit_report_34.md [STATE-F010])
     [v1.8.0] 비관적 락 및 리프레시 추가: TOCTOU 동시성 이슈 및 Lost Update 방지 (audit_report_47.md [STATE-F020])
     반환: bool (True = 보호 모드에 진입해서 자원이 보충됨)
@@ -280,12 +280,12 @@ def check_and_enter_protection(park):
         park.material = GC.PROTECT_RESET_MATERIAL
         reset_applied = True
 
-    # 사기 최소 보장
+    # 사기 최소 유지
     if park.morale < 30:
         park.morale = 30
         reset_applied = True
 
-    # 보스 HP 최소 보장
+    # 보스 HP 최소 유지
     if park.boss_hp < 50:
         park.boss_hp = 50
         reset_applied = True
@@ -1217,7 +1217,7 @@ def _process_cannibalism(park):
     if not GC.CANNIBALISM_AUTO_ENABLED or park.is_destroyed:
         return
 
-    # 식량이 완전히 바닥났을 때만 발동
+    # 식량이 바닥났을 때만 발동
     if park.trash_food > 0 or park.meat_stock > 0 or park.konpeito > 0:
         return
 
@@ -1488,7 +1488,7 @@ def _process_spy_missions(park):
                           DLG.get_random_dialogue(DLG.SPY_ENEMY_DETECTED))
                 db.session.commit()  # [v1.7.0] 임무 단위로 커밋하여 락 즉시 해제 (audit_report_22.md [DEADLOCK-F001])
             else:
-                # 사보타주 성공 [v1.8.5] 비관적 락 확보 상태이므로 TOCTOU 격차 0 보장 (audit_report_54.md [LOGIC-F021])
+                # 사보타주 성공 [v1.8.5] 비관적 락 확보 상태이므로 TOCTOU 격차를 낮출 수 있음 (audit_report_54.md [LOGIC-F021])
                 food_ratio = random.uniform(*GC.SPY_SABOTAGE_FOOD_RATIO)
                 food_destroyed = int(target.trash_food * food_ratio)
                 baby_killed = min(GC.SPY_SABOTAGE_BABY_KILL, target.baby_count)
