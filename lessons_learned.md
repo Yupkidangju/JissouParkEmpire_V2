@@ -116,10 +116,10 @@
 | v1.8.6 | NPC 턴 중간 커밋 락 해제 및 AI 행동 예외 시 락 유실 | 일괄 동기화 트랜잭션 쪼개짐에 따른 락 조기 해제 및 AI 예외 롤백 시 전체 락 소실과 스탬피드 유발 | 개별 트랜잭션 단위 비관적 락 확보, Nested Savepoint 예외 가드 및 밀사 2-Way Lock 격리 적용 |
 | v1.8.7 | 교역 거절 IDOR 및 좀비 거래 | 타인의 교역을 마음대로 거절 폭파하거나 멸망한 유저의 교역이 시장에 노출되어 리소스 및 UI 점유 | trade_reject UPDATE에 receiver_id 일치 조건 강제 및 trade_market 쿼리에 Park JOIN 및 is_destroyed == False 가드 탑재 |
 | v1.8.8 | 슬로우 패스 AP 덮어쓰기 및 복제 | 턴 스케줄러 동기화 도중 락이 해제되어 비동기 요청이 AP를 깎아도 메모리 구버전 데이터로 덮어씀 | _sync_npc_turns 완료 후 최종 감산 전 플레이어 공원에 대해 다시 with_for_update() 및 refresh() 적용 |
-| v1.8.9 | NPC 공격 시 트랜잭션 붕괴 | NPC 루프 정지, AP 무한 복제 | commit 대신 flush 사용 및 2차 롤백 예외 방어로 완치 |
+| v1.8.9 | NPC 공격 시 트랜잭션 붕괴 | NPC 루프 정지, AP 무한 복제 | commit 대신 flush 사용 및 2차 롤백 예외 방어로 고도 예방 |
 | v1.8.9 | AP 환불 유실 버그 | 멸망/기각 시 1AP 영구 누수 | 라우터 단에서 즉시 명시적 commit을 수행하여 수치 보존 |
 | v1.8.9 | 밀사 overcrowding 자원/인구 덮어쓰기 | 채집/교역 변경점 소멸 or 복제 | 연산 직전 `with_for_update()` 락 및 refresh로 데이터 덮어쓰기 레이스 차단 |
-| v1.8.9 | NPC 공격 락 순서 역전 데드락 | 서비스 장애 및 DB 커넥션 풀 고갈 | 최상단 비관적 락 제거 후 execute_battle 내 Canonical Locking에 위임하여 완치 |
+| v1.8.9 | NPC 공격 락 순서 역전 데드락 | 서비스 장애 및 DB 커넥션 풀 고갈 | 최상단 비관적 락 제거 후 execute_battle 내 Canonical Locking에 위임하여 고도 예방 |
 
 ---
 

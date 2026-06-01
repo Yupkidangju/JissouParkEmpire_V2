@@ -259,7 +259,7 @@ console.log(escapeHtml({repr(malicious_js_input)}));
     )
     escaped_js_from_node = node_process.stdout.strip()
 
-    # 최종 검증: Node.js를 통해 실제 game.js가 처리한 XSS 이스케이프 문자열이 파이썬 모방 검증 결과와 완전히(100%) 동일해야 함
+    # 최종 검증: Node.js를 통해 실제 game.js가 처리한 XSS 이스케이프 문자열이 파이썬 모방 검증 결과와 일치해야 함
     assert escaped_js_from_node == escaped_js
     assert "<script>" not in escaped_js_from_node
     assert "&lt;script&gt;" in escaped_js_from_node
@@ -272,7 +272,7 @@ def test_sqlite_lost_update_race_condition(app):
     두 개의 독립 세션(Session A, Session B)을 통해 동일한 Park 데이터를 stale read한 상태에서
     stale write-back(Lost Update) 위협이 발생할 때,
     실제 게임 엔진 함수인 _process_spy_missions() 내부의 db.session.refresh() 논리가
-    stale data를 완벽히 새로고침하여 최종 일관성(Consistent State)을 회복하는지 실질적 구현 경로를 통해 검증합니다.
+    stale data를 정밀하게 새로고침하여 최종 일관성(Consistent State)을 회복하는지 실질적 구현 경로를 통해 검증합니다.
     [변별력 설계 (Mutation-Sensitive)]:
     - 초기 상태: adult_count = 14, population_cap = 15 (수용량 이하 상태)
     - Session A: adult_count = 25 로 변경하고 commit
